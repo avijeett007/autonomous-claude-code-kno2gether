@@ -1,6 +1,10 @@
-2025-05-19 21:13:23,896 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
-Traceback (most recent call last):
-  File "/Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/worker.py", line 143, in <module>
-    with connections.push_connection(redis_conn):
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: module 'rq.connections' has no attribute 'push_connection'. Did you mean: 'parse_connection'?
+2025-05-19 21:20:21,894 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+21:20:21 Worker rq:worker:dd17eb21380b46789bfbabc55f380b9b started with PID 95905, version 2.3.3
+21:20:21 Subscribing to channel rq:pubsub:dd17eb21380b46789bfbabc55f380b9b
+21:20:21 *** Listening on autonomous-coding...
+21:20:21 Cleaning registries for queue: autonomous-coding
+21:20:21 autonomous-coding: worker.process_github_issue(1) (1e3a7a62-fd7c-4917-8a86-601437ed06e7)
+2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
+2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run

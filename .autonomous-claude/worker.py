@@ -5,7 +5,6 @@ import time
 import subprocess
 from redis import Redis
 from rq import Worker, Queue
-import rq.connections as connections
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -140,6 +139,6 @@ def update_project_documentation():
 if __name__ == '__main__':
     logger.info(f"Starting worker for queue: {queue_name}")
     
-    with connections.push_connection(redis_conn):
-        worker = Worker([queue])
-        worker.work()
+    # Create and start the worker directly with the queue that already has the connection
+    worker = Worker([queue], connection=redis_conn)
+    worker.work()

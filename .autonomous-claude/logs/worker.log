@@ -1,1 +1,6 @@
 2025-05-19 21:13:23,896 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 21:20:21,894 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
+2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
