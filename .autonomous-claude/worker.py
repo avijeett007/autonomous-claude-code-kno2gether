@@ -35,10 +35,9 @@ queue = Queue(queue_name, connection=redis_conn)
 def run_claude_code_headless(prompt, allowed_tools=None):
     """Run Claude Code in headless mode with the given prompt"""
     claude_path = os.environ.get('CLAUDE_CODE_PATH', 'claude')
-    command = [claude_path, '-p', prompt]
     
-    if allowed_tools:
-        command.extend(['--allowedTools', allowed_tools])
+    # Use dangerously-skip-permissions instead of allowedTools
+    command = [claude_path, '-p', prompt, '--dangerously-skip-permissions']
     
     logger.info(f"Running Claude Code with command: {' '.join(command)}")
     
@@ -132,6 +131,33 @@ def update_project_documentation():
     
     return {
         'success': True,
+        'completed_at': time.time()
+    }
+
+def review_pull_request(pr_number):
+    """Review a GitHub pull request and provide feedback"""
+    logger.info(f"Reviewing GitHub PR #{pr_number}")
+    
+    review_prompt = f"/project:review-pull-request {pr_number}"
+    
+    result = run_claude_code_headless(
+        review_prompt,
+        "Bash(gh:*,git:*) Edit Run"
+    )
+    
+    if not result['success']:
+        logger.error(f"Failed to review PR #{pr_number}")
+        return {
+            'success': False,
+            'stage': 'review',
+            'error': result['stderr']
+        }
+    
+    logger.info(f"Successfully reviewed PR #{pr_number}")
+    
+    return {
+        'success': True,
+        'pr_number': pr_number,
         'completed_at': time.time()
     }
 

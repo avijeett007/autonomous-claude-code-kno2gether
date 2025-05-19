@@ -6,7 +6,7 @@ from rq import Queue
 
 # Add parent directory to path so we can import worker
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from worker import process_github_issue, update_project_documentation
+from worker import process_github_issue, update_project_documentation, review_pull_request
 
 # Redis connection
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
@@ -29,6 +29,17 @@ def enqueue_update_documentation():
     """Add a documentation update task to the queue"""
     job = queue.enqueue(
         update_project_documentation,
+        job_timeout='1h',
+        result_ttl=86400,
+        ttl=86400
+    )
+    return job.id
+
+def enqueue_review_pull_request(pr_number):
+    """Add a PR review task to the queue"""
+    job = queue.enqueue(
+        review_pull_request,
+        pr_number,
         job_timeout='1h',
         result_ttl=86400,
         ttl=86400

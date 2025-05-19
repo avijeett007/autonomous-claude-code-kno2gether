@@ -26,6 +26,9 @@ LOG_FILE="$PROJECT_PATH/.autonomous-claude/logs/$(date +%Y-%m-%d).log"
 CONFIG_FILE="$PROJECT_PATH/.autonomous-claude/config.sh"
 REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
+PR_REVIEW_ENABLED=true
+REVIEW_ONLY_OWN_PRS=true
+GITHUB_USERNAME=""
 
 # ===== Helper Functions =====
 
@@ -163,6 +166,9 @@ init_project() {
     # Get GitHub repository from remote
     GITHUB_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
     
+    # Get GitHub username
+    GITHUB_USERNAME=$(gh api user -q .login 2>/dev/null || echo "")
+    
     cat > "$CONFIG_FILE" << EOF
 #!/usr/bin/env bash
 # Autonomous Claude configuration
@@ -172,11 +178,16 @@ PROJECT_PATH="$PROJECT_PATH"
 DOCS_PATH="$PROJECT_PATH/docs"
 GITHUB_REPO="$GITHUB_REPO"
 GITHUB_ISSUE_LABEL="autonomous-coding"
+GITHUB_USERNAME="$GITHUB_USERNAME"
 
 # Operation settings
 POLLING_INTERVAL=300
 REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
+
+# PR review settings
+PR_REVIEW_ENABLED=true
+REVIEW_ONLY_OWN_PRS=true
 
 # Paths
 CLAUDE_CODE_PATH="$CLAUDE_CODE_PATH"
@@ -482,6 +493,9 @@ EOF
 check_github_issues() {
   log "INFO" "Checking GitHub issues..."
   
+  # Ensure tasks directory exists
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
+  
   # Get the list of open issues with the specified label
   issues=$(gh issue list --repo "$GITHUB_REPO" --label "$GITHUB_ISSUE_LABEL" --state open --json number,title,url)
   
@@ -491,27 +505,67 @@ check_github_issues() {
     return 0
   fi
   
-  # Process each issue
-  echo "$issues" | python3 -c "
-import json
-import sys
-import os
-sys.path.append('$PROJECT_PATH/.autonomous-claude')
-from tasks import enqueue_process_github_issue
+  # Set necessary environment variables for the Python script
+  export PROJECT_PATH="$PROJECT_PATH"
+  
+  # Make the script executable
+  chmod +x "$PROJECT_PATH/.autonomous-claude/github_issue_checker.py"
+  
+  # Process issues using the standalone Python script
+  log "INFO" "Running GitHub issue checker script..."
+  
+  cd "$PROJECT_PATH"
+  source "$PROJECT_PATH/.autonomous-claude/venv/bin/activate"
+  echo "$issues" | python3 "$PROJECT_PATH/.autonomous-claude/github_issue_checker.py"
+  script_exit=$?
+  
+  if [ $script_exit -ne 0 ]; then
+    log "ERROR" "GitHub issue checker script failed with exit code $script_exit"
+    return 1
+  fi
+}
 
-issues = json.load(sys.stdin)
-for issue in issues:
-    # Check if this issue is already being processed
-    issue_number = issue['number']
-    task_file = os.path.join('$PROJECT_PATH', '.autonomous-claude', 'tasks', f'{issue_number}-plan.md')
-    
-    if not os.path.exists(task_file):
-        print(f'Processing issue #{issue_number}: {issue[\"title\"]}')
-        job_id = enqueue_process_github_issue(issue_number)
-        print(f'Enqueued job with ID: {job_id}')
-    else:
-        print(f'Issue #{issue_number} already has a plan, skipping')
-"
+check_github_prs() {
+  log "INFO" "Checking GitHub PRs..."
+  
+  # Ensure tasks directory exists
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
+  
+  # Get the list of open PRs
+  prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author)
+  
+  # Check if there are any PRs
+  if [ -z "$prs" ] || [ "$prs" == "[]" ]; then
+    log "INFO" "No open PRs found."
+    return 0
+  fi
+  
+  # Set necessary environment variables for the Python script
+  export PROJECT_PATH="$PROJECT_PATH"
+  export GITHUB_USERNAME="$GITHUB_USERNAME"
+  export REVIEW_ONLY_OWN_PRS="$REVIEW_ONLY_OWN_PRS"
+  
+  # Create PR checker script if it doesn't exist
+  if [ ! -f "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py" ]; then
+    log "INFO" "PR checker script not found, skipping PR checks."
+    return 0
+  fi
+  
+  # Make the script executable
+  chmod +x "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
+  
+  # Process PRs using the standalone Python script
+  log "INFO" "Running GitHub PR checker script..."
+  
+  cd "$PROJECT_PATH"
+  source "$PROJECT_PATH/.autonomous-claude/venv/bin/activate"
+  echo "$prs" | python3 "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
+  script_exit=$?
+  
+  if [ $script_exit -ne 0 ]; then
+    log "ERROR" "GitHub PR checker script failed with exit code $script_exit"
+    return 1
+  fi
 }
 
 generate_documentation() {
@@ -610,6 +664,11 @@ main_loop() {
   while true; do
     # Check for GitHub issues
     check_github_issues
+    
+    # Check for GitHub PRs that need review
+    if [ "$PR_REVIEW_ENABLED" = "true" ]; then
+      check_github_prs
+    fi
     
     # Sleep for the polling interval
     log "DEBUG" "Sleeping for $POLLING_INTERVAL seconds..."
