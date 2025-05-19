@@ -1,0 +1,5 @@
+RQ Dashboard version 0.8.2.2
+ * Running on 0.0.0.0:9181
+Use --redis-url=redis://localhost:6379 configuration option instead of specifying host, port and other parameters separately
+ * Serving Flask app 'rq_dashboard.cli'
+ * Debug mode: off
