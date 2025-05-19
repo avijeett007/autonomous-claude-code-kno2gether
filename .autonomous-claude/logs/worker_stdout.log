@@ -1,4 +1,6 @@
+2025-05-19 21:13:23,896 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
 Traceback (most recent call last):
-  File "/Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/worker.py", line 7, in <module>
-    from rq import Worker, Queue, Connection
-ImportError: cannot import name 'Connection' from 'rq' (/Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/venv/lib/python3.13/site-packages/rq/__init__.py). Did you mean: 'connections'?
+  File "/Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/worker.py", line 143, in <module>
+    with connections.push_connection(redis_conn):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'rq.connections' has no attribute 'push_connection'. Did you mean: 'parse_connection'?
