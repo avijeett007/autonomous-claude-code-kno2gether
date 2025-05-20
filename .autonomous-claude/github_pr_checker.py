@@ -13,6 +13,14 @@ import logging
 import traceback
 import importlib.util
 
+# Try to import GitHub API helper
+try:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from github_api_helper import run_gh_command, get_pull_request, extract_issue_number_from_pr
+    use_api_helper = True
+except ImportError:
+    use_api_helper = False
+
 # Setup logging
 log_dir = os.path.join(os.getcwd(), '.autonomous-claude', 'logs')
 os.makedirs(log_dir, exist_ok=True)
@@ -95,6 +103,36 @@ def should_review_pr(pr):
             logger.info(f"Skipping PR #{pr['number']} as it's not authored by {github_username}")
             return False
     
+    # Check for PR-issue relationship if we're using the API helper
+    if use_api_helper:
+        try:
+            pr_number = pr['number']
+            
+            # Try to extract issue number from PR description
+            pr_detail = get_pull_request(pr_number)
+            if pr_detail:
+                issue_number = extract_issue_number_from_pr(pr_detail)
+                if issue_number:
+                    # Import PR relationship module if needed
+                    try:
+                        project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+                        module_path = os.path.join(project_path, '.autonomous-claude', 'pr_issue_relationship.py')
+                        
+                        if os.path.exists(module_path):
+                            sys.path.append(os.path.dirname(os.path.abspath(module_path)))
+                            from pr_issue_relationship import get_instance
+                            relationship_manager = get_instance()
+                            
+                            # Record the relationship
+                            relationship_manager.associate_pr_with_issue(issue_number, pr_number)
+                            logger.info(f"Associated PR #{pr_number} with issue #{issue_number}")
+                    except ImportError as e:
+                        logger.warning(f"Failed to import PR relationship module: {str(e)}")
+                    except Exception as e:
+                        logger.warning(f"Failed to associate PR with issue: {str(e)}")
+        except Exception as e:
+            logger.warning(f"Error extracting issue from PR: {str(e)}")
+    
     return True
 
 def process_pull_requests(prs_json):
@@ -124,30 +162,42 @@ def process_pull_requests(prs_json):
             # Create lock file
             create_lock_file(pr_number)
             
-            # Enqueue the PR for review
-            try:
-                job_id = tasks.enqueue_review_pull_request(pr_number)
-                logger.info(f"Enqueued PR #{pr_number} for review with job ID: {job_id}")
-                
-                # Add job ID to lock file
-                lock_file = os.path.join(os.environ.get('PROJECT_PATH', os.getcwd()),
-                                        '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
+            # Add retry mechanism for enqueueing
+            max_retries = 3
+            retry_delay = 10  # seconds
+            success = False
+            
+            for attempt in range(1, max_retries + 1):
                 try:
-                    with open(lock_file, 'a') as f:
-                        f.write(f"Job ID: {job_id}\n")
+                    job_id = tasks.enqueue_review_pull_request(pr_number)
+                    logger.info(f"Enqueued PR #{pr_number} for review with job ID: {job_id} (attempt {attempt})")
+                    
+                    # Add job ID to lock file
+                    lock_file = os.path.join(os.environ.get('PROJECT_PATH', os.getcwd()),
+                                            '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
+                    try:
+                        with open(lock_file, 'a') as f:
+                            f.write(f"Job ID: {job_id}\n")
+                    except Exception as e:
+                        logger.error(f"Error updating lock file: {str(e)}")
+                    
+                    print(f"Enqueued PR review job with ID: {job_id}")
+                    success = True
+                    break
                 except Exception as e:
-                    logger.error(f"Error updating lock file: {str(e)}")
-                
-                print(f"Enqueued PR review job with ID: {job_id}")
-            except Exception as e:
-                logger.error(f"Failed to enqueue PR #{pr_number}: {str(e)}")
-                traceback.print_exc()
-                
-                # Remove lock file on failure
-                project_path = os.environ.get('PROJECT_PATH', os.getcwd())
-                lock_file = os.path.join(project_path, '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
-                if os.path.exists(lock_file):
-                    os.remove(lock_file)
+                    logger.error(f"Failed to enqueue PR #{pr_number} on attempt {attempt}: {str(e)}")
+                    if attempt < max_retries:
+                        logger.info(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        traceback.print_exc()
+                        
+                        # Remove lock file on final failure
+                        project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+                        lock_file = os.path.join(project_path, '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
+                        if os.path.exists(lock_file):
+                            os.remove(lock_file)
         
         return True
     except json.JSONDecodeError:

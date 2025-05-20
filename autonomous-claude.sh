@@ -28,7 +28,12 @@ REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
 PR_REVIEW_ENABLED=true
 PR_AUTO_REVIEW=true  # Auto-review PR after creation
-REVIEW_ONLY_OWN_PRS=true
+PR_AUTO_REVIEW_DELAY=30  # Delay in seconds before auto-review
+PR_REVIEW_MAX_RETRIES=3  # Maximum number of retry attempts for PR reviews
+PR_REVIEW_RETRY_DELAY=60  # Initial delay in seconds between retry attempts
+PR_UPDATE_DETECTION=true  # Monitor PRs for updates and trigger re-reviews
+MIN_REREVIEW_HOURS=24  # Minimum hours between re-reviews
+REVIEW_ONLY_OWN_PRS=true  # Only review PRs created by this system
 GITHUB_USERNAME=""
 
 # ===== Helper Functions =====
@@ -191,7 +196,12 @@ REDIS_QUEUE="autonomous-coding"
 # PR review settings
 PR_REVIEW_ENABLED=true
 PR_AUTO_REVIEW=true  # Automatically review PR after creation
-REVIEW_ONLY_OWN_PRS=true
+PR_AUTO_REVIEW_DELAY=30  # Delay in seconds before auto-review
+PR_REVIEW_MAX_RETRIES=3  # Maximum number of retry attempts for PR reviews
+PR_REVIEW_RETRY_DELAY=60  # Initial delay in seconds between retry attempts
+PR_UPDATE_DETECTION=true  # Monitor PRs for updates and trigger re-reviews
+MIN_REREVIEW_HOURS=24  # Minimum hours between re-reviews
+REVIEW_ONLY_OWN_PRS=true  # Only review PRs created by this system
 
 # Paths
 CLAUDE_CODE_PATH="$CLAUDE_CODE_PATH"
@@ -775,6 +785,10 @@ EOF
   export REDIS_URL="$REDIS_URL"
   export REDIS_QUEUE="$REDIS_QUEUE"
   export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
+  export PR_AUTO_REVIEW_DELAY="$PR_AUTO_REVIEW_DELAY"
+  export PR_REVIEW_MAX_RETRIES="$PR_REVIEW_MAX_RETRIES"
+  export PR_REVIEW_RETRY_DELAY="$PR_REVIEW_RETRY_DELAY"
+  export MIN_REREVIEW_HOURS="$MIN_REREVIEW_HOURS"
   
   log "INFO" "Starting worker in the background..."
   python3 "$PROJECT_PATH/.autonomous-claude/worker.py" > "$PROJECT_PATH/.autonomous-claude/logs/worker_stdout.log" 2>&1 &
@@ -889,8 +903,8 @@ check_github_prs() {
   mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
   
-  # Get the list of open PRs
-  prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author)
+  # Get the list of open PRs with detailed information
+  prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author,updatedAt,commits,additions,deletions,changedFiles)
   
   # Check if there are any PRs
   if [ -z "$prs" ] || [ "$prs" == "[]" ]; then
@@ -898,11 +912,15 @@ check_github_prs() {
     return 0
   fi
   
-  # Set necessary environment variables for the Python script
+  # Set necessary environment variables for the Python scripts
   export PROJECT_PATH="$PROJECT_PATH"
   export GITHUB_USERNAME="$GITHUB_USERNAME"
   export REVIEW_ONLY_OWN_PRS="$REVIEW_ONLY_OWN_PRS"
   export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
+  export PR_AUTO_REVIEW_DELAY="$PR_AUTO_REVIEW_DELAY"
+  export PR_REVIEW_MAX_RETRIES="$PR_REVIEW_MAX_RETRIES"
+  export PR_REVIEW_RETRY_DELAY="$PR_REVIEW_RETRY_DELAY"
+  export MIN_REREVIEW_HOURS="$MIN_REREVIEW_HOURS"
   
   # Create PR checker script if it doesn't exist
   pr_checker_script="$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
@@ -914,8 +932,8 @@ check_github_prs() {
   # Make the script executable
   chmod +x "$pr_checker_script"
   
-  # Process PRs using the Python script
-  log "INFO" "Running GitHub PR checker script..."
+  # Process PRs using the Python script for new PRs
+  log "INFO" "Running GitHub PR checker script for new PRs..."
   
   cd "$PROJECT_PATH"
   source "$PROJECT_PATH/.autonomous-claude/venv/bin/activate"
@@ -925,6 +943,28 @@ check_github_prs() {
   if [ $script_exit -ne 0 ]; then
     log "ERROR" "GitHub PR checker script failed with exit code $script_exit"
     return 1
+  fi
+  
+  # Process PRs using the update detector script if enabled
+  if [ "$PR_UPDATE_DETECTION" = "true" ]; then
+    pr_update_detector="$PROJECT_PATH/.autonomous-claude/github_pr_update_detector.py"
+    
+    if [ ! -f "$pr_update_detector" ]; then
+      log "ERROR" "PR update detector script not found: $pr_update_detector"
+      return 1
+    fi
+    
+    # Make the script executable
+    chmod +x "$pr_update_detector"
+    
+    log "INFO" "Running GitHub PR update detector for changed PRs..."
+    echo "$prs" | python3 "$pr_update_detector"
+    detector_exit=$?
+    
+    if [ $detector_exit -ne 0 ]; then
+      log "ERROR" "GitHub PR update detector failed with exit code $detector_exit"
+      # Continue anyway, as this is not critical
+    fi
   fi
 }
 

@@ -6,70 +6,106 @@
 **URL**: {pr_url}
 **Changes**: +{additions} / -{deletions} in {changed_files} files
 **Related Issue**: {issue_relationship}
+**Review Type**: {review_type}
+**Review Date**: {review_timestamp}
 
 ## Overview Assessment
 
 {assessment_summary}
 
-## Review Details
+**Final Recommendation**: {final_recommendation}
 
-### Code Quality
+## Severity Ratings
+
+Issues found in this PR are categorized with the following severity levels:
+- **Critical**: Must be fixed before merging - serious bugs or security issues
+- **High**: Should be fixed before merging - significant code quality or functionality issues
+- **Medium**: Consider fixing - important improvements but not blocking
+- **Low**: Nice-to-have improvements that can be addressed in future PRs
+
+## Code Quality Analysis
 
 {code_quality_assessment}
 
-**Observations**:
-{code_quality_observations}
+**Issues Found**:
 
-### Potential Bugs/Issues
+{code_quality_issues}
+
+## Potential Bugs/Issues
 
 {bugs_assessment}
 
 **Issues Found**: 
+
 {bugs_list}
 
-### Testing
-
-{testing_assessment}
-
-**Test Coverage**: 
-{test_coverage}
-
-### Implementation Completeness
-
-{completeness_assessment}
-
-**Missing Items**:
-{missing_items}
-
-### Performance Considerations
-
-{performance_assessment}
-
-**Recommendations**:
-{performance_recommendations}
-
-### Security Considerations
+## Security Considerations
 
 {security_assessment}
 
 **Security Issues**:
+
 {security_issues}
+
+## Performance Analysis
+
+{performance_assessment}
+
+**Performance Issues**:
+
+{performance_issues}
+
+**Recommendations**:
+
+{performance_recommendations}
+
+## Testing Analysis
+
+{testing_assessment}
+
+**Test Coverage**: 
+
+{test_coverage}
+
+**Test Quality**:
+
+{test_quality}
+
+## Implementation Completeness
+
+{completeness_assessment}
+
+**Missing Items**:
+
+{missing_items}
+
+## Documentation Quality
+
+{documentation_assessment}
+
+**Documentation Issues**:
+
+{documentation_issues}
 
 ## File-by-File Analysis
 
 {file_analysis}
 
+## Positive Aspects
+
+{positive_aspects}
+
 ## Suggestions for Improvement
 
 {suggestions}
 
-## Questions
+## Questions for Author
 
 {questions}
 
-## Recommendation
+## Next Steps
 
-{recommendation}
+{next_steps}
 
 ---
 

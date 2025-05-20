@@ -222,13 +222,17 @@ Each project will have its own autonomous system, including:
 
 Autonomous Claude includes a powerful PR review functionality that can automatically review pull requests. For detailed documentation, see [PR Review Documentation](pr-review.md).
 
-### Basic PR Review Features
+### Enhanced PR Review Features
 
 - **Automatic Review**: PRs can be automatically reviewed after creation
 - **Structured Reviews**: Uses a standardized template for consistent, comprehensive reviews
 - **Issue-PR Relationship**: Tracks which PRs relate to which issues
-- **Re-review Detection**: Automatically re-reviews PRs when they're updated
+- **Re-review Detection**: Smart detection of PR updates that require re-reviews
 - **Review History**: Maintains a history of all reviews for each PR
+- **Review Analytics**: Tracks statistics and metrics about PRs and reviews
+- **Severity Ratings**: Categorizes issues by severity (Critical, High, Medium, Low)
+- **Differential Re-Reviews**: Focuses on changes since the last review
+- **Robust Error Handling**: Better handling of API errors and retries
 
 ### PR Review Configuration
 
@@ -236,9 +240,14 @@ You can configure the PR review system in `.autonomous-claude/config.sh`:
 
 ```bash
 # PR review settings
-PR_REVIEW_ENABLED=true  # Enable PR review functionality
-PR_AUTO_REVIEW=true     # Automatically review PRs after creation
-REVIEW_ONLY_OWN_PRS=true  # Only review PRs created by the system
+PR_REVIEW_ENABLED=true          # Enable PR review functionality
+PR_AUTO_REVIEW=true             # Automatically review PRs after creation
+PR_AUTO_REVIEW_DELAY=30         # Delay in seconds before auto-review
+PR_REVIEW_MAX_RETRIES=3         # Maximum number of retry attempts
+PR_REVIEW_RETRY_DELAY=60        # Initial delay in seconds between retries
+PR_UPDATE_DETECTION=true        # Monitor PRs for updates and trigger re-reviews
+MIN_REREVIEW_HOURS=24           # Minimum hours between re-reviews
+REVIEW_ONLY_OWN_PRS=true        # Only review PRs created by the system
 ```
 
 ### Manually Triggering PR Review
