@@ -26,6 +26,10 @@ LOG_FILE="$PROJECT_PATH/.autonomous-claude/logs/$(date +%Y-%m-%d).log"
 CONFIG_FILE="$PROJECT_PATH/.autonomous-claude/config.sh"
 REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
+PR_REVIEW_ENABLED=true
+PR_AUTO_REVIEW=true  # Auto-review PR after creation
+REVIEW_ONLY_OWN_PRS=true
+GITHUB_USERNAME=""
 
 # ===== Helper Functions =====
 
@@ -141,7 +145,9 @@ init_project() {
   # Create required directories
   mkdir -p "$PROJECT_PATH/.autonomous-claude/logs"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/templates"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
   mkdir -p "$DOCS_PATH"
   
   # Check if CLAUDE.md exists, if not create it
@@ -163,6 +169,9 @@ init_project() {
     # Get GitHub repository from remote
     GITHUB_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
     
+    # Get GitHub username
+    GITHUB_USERNAME=$(gh api user -q .login 2>/dev/null || echo "")
+    
     cat > "$CONFIG_FILE" << EOF
 #!/usr/bin/env bash
 # Autonomous Claude configuration
@@ -172,11 +181,17 @@ PROJECT_PATH="$PROJECT_PATH"
 DOCS_PATH="$PROJECT_PATH/docs"
 GITHUB_REPO="$GITHUB_REPO"
 GITHUB_ISSUE_LABEL="autonomous-coding"
+GITHUB_USERNAME="$GITHUB_USERNAME"
 
 # Operation settings
 POLLING_INTERVAL=300
 REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
+
+# PR review settings
+PR_REVIEW_ENABLED=true
+PR_AUTO_REVIEW=true  # Automatically review PR after creation
+REVIEW_ONLY_OWN_PRS=true
 
 # Paths
 CLAUDE_CODE_PATH="$CLAUDE_CODE_PATH"
@@ -260,6 +275,36 @@ Be sure to:
 - Add appropriate comments and documentation
 - Write clean, maintainable code
 - Handle edge cases and errors appropriately
+EOF
+
+  # Command: Review PR
+  cat > "$PROJECT_PATH/.claude/commands/review-pull-request.md" << EOF
+This command will review a GitHub pull request and provide detailed feedback.
+
+The argument should be the GitHub PR number.
+
+Follow these steps:
+1. Use the GitHub CLI to fetch detailed information about the PR
+2. Get the full diff of the PR changes
+3. Analyze the code changes for:
+   - Code quality issues
+   - Potential bugs or logical errors
+   - Security concerns
+   - Performance considerations
+   - Adherence to project coding standards
+   - Completeness of implementation
+4. Generate a comprehensive review that includes:
+   - An overall assessment of the PR
+   - Specific feedback on each file changed
+   - Suggestions for improvements
+   - Questions about implementation decisions
+5. Post the review as a comment on the PR using the GitHub CLI
+
+Your review should be constructive, detailed, and helpful. Focus on making the code better rather than just pointing out issues.
+
+The review should be helpful both to the PR author and to future developers who might read the code.
+
+ARGUMENTS: {pr_number}
 EOF
 
   log "INFO" "Custom Claude commands created successfully."
@@ -408,6 +453,68 @@ def update_project_documentation():
         'completed_at': time.time()
     }
 
+def review_pull_request(pr_number):
+    """Review a GitHub pull request and provide feedback"""
+    logger.info(f"Reviewing GitHub PR #{pr_number}")
+    
+    # Ensure reviews directory exists
+    project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+    reviews_dir = os.path.join(project_path, '.autonomous-claude', 'reviews')
+    os.makedirs(reviews_dir, exist_ok=True)
+    
+    # Create a lock file to indicate the PR is being processed
+    lock_file = os.path.join(reviews_dir, f"pr-{pr_number}.lock")
+    if not os.path.exists(lock_file):
+        with open(lock_file, 'w') as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"Review started: {timestamp}\n")
+    
+    # Check if a review already exists
+    review_file = os.path.join(reviews_dir, f"pr-{pr_number}-review.md")
+    if os.path.exists(review_file):
+        logger.info(f"Review already exists for PR #{pr_number}, skipping")
+        return {
+            'success': True,
+            'pr_number': pr_number,
+            'completed_at': time.time(),
+            'status': 'skipped'
+        }
+        
+    review_prompt = f"/project:review-pull-request {pr_number}"
+    
+    result = run_claude_code_headless(
+        review_prompt,
+        "Bash(gh:*,git:*) Edit Run"
+    )
+    
+    # Remove lock file after processing
+    try:
+        os.remove(lock_file)
+    except:
+        logger.warning(f"Failed to remove lock file for PR #{pr_number}")
+    
+    if not result['success']:
+        logger.error(f"Failed to review PR #{pr_number}")
+        return {
+            'success': False,
+            'stage': 'review',
+            'error': result['stderr']
+        }
+    
+    logger.info(f"Successfully reviewed PR #{pr_number}")
+    
+    # Check if review file was created
+    if os.path.exists(review_file):
+        logger.info(f"Review file created for PR #{pr_number}")
+    else:
+        logger.warning(f"Review file not created for PR #{pr_number}")
+    
+    return {
+        'success': True,
+        'pr_number': pr_number,
+        'completed_at': time.time()
+    }
+
 # Worker loop
 if __name__ == '__main__':
     logger.info(f"Starting worker for queue: {queue_name}")
@@ -431,7 +538,7 @@ from rq import Queue
 
 # Add parent directory to path so we can import worker
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from worker import process_github_issue, update_project_documentation
+from worker import process_github_issue, update_project_documentation, review_pull_request
 
 # Redis connection
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
@@ -459,9 +566,205 @@ def enqueue_update_documentation():
         ttl=86400
     )
     return job.id
+
+def enqueue_review_pull_request(pr_number):
+    """Add a PR review task to the queue"""
+    job = queue.enqueue(
+        review_pull_request,
+        pr_number,
+        job_timeout='1h',
+        result_ttl=86400,
+        ttl=86400
+    )
+    return job.id
 EOF
 
     log "INFO" "Created tasks script at $PROJECT_PATH/.autonomous-claude/tasks.py"
+  fi
+  
+  # Create PR checker script if it doesn't exist
+  if [ ! -f "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py" ]; then
+    cat > "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py" << 'EOF'
+#!/usr/bin/env python3
+# github_pr_checker.py
+#
+# Processes GitHub pull requests for autonomous review workflow
+# Reads PR data from stdin and enqueues them for processing
+
+import os
+import sys
+import json
+import time
+from datetime import datetime
+import logging
+import traceback
+import importlib.util
+
+# Setup logging
+log_dir = os.path.join(os.getcwd(), '.autonomous-claude', 'logs')
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'github_pr_checker.log')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger('github-pr-checker')
+
+# Load tasks module dynamically
+def import_tasks_module():
+    project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+    tasks_path = os.path.join(project_path, '.autonomous-claude', 'tasks.py')
+    
+    if not os.path.exists(tasks_path):
+        logger.error(f"Tasks module not found at {tasks_path}")
+        sys.exit(1)
+    
+    spec = importlib.util.spec_from_file_location("tasks", tasks_path)
+    tasks_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tasks_module)
+    return tasks_module
+
+def is_already_reviewed(pr_number):
+    """Check if a PR has already been reviewed or is being processed"""
+    project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+    reviews_dir = os.path.join(project_path, '.autonomous-claude', 'reviews')
+    os.makedirs(reviews_dir, exist_ok=True)
+    
+    # Review file would indicate PR has been reviewed
+    review_file = os.path.join(reviews_dir, f"pr-{pr_number}-review.md")
+    if os.path.exists(review_file):
+        logger.info(f"PR #{pr_number} already has a review file")
+        return True
+    
+    # Lock file indicates PR is being processed
+    lock_file = os.path.join(reviews_dir, f"pr-{pr_number}.lock")
+    if os.path.exists(lock_file):
+        # Check if lock is stale (older than 1 hour)
+        lock_time = os.path.getmtime(lock_file)
+        if time.time() - lock_time < 3600:  # 1 hour in seconds
+            logger.info(f"PR #{pr_number} is currently being processed")
+            return True
+        else:
+            logger.warning(f"Found stale lock for PR #{pr_number}, removing")
+            os.remove(lock_file)
+    
+    return False
+
+def create_lock_file(pr_number):
+    """Create a lock file to indicate a PR is being processed"""
+    project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+    reviews_dir = os.path.join(project_path, '.autonomous-claude', 'reviews')
+    os.makedirs(reviews_dir, exist_ok=True)
+    
+    lock_file = os.path.join(reviews_dir, f"pr-{pr_number}.lock")
+    with open(lock_file, 'w') as f:
+        timestamp = datetime.now().isoformat()
+        f.write(f"Review started: {timestamp}\n")
+    
+    logger.info(f"Created lock file for PR #{pr_number}")
+    return True
+
+def should_review_pr(pr):
+    """Determine if a PR should be reviewed based on configuration"""
+    # Check if we should only review PRs from our own system
+    review_only_own = os.environ.get('REVIEW_ONLY_OWN_PRS', 'true').lower() == 'true'
+    github_username = os.environ.get('GITHUB_USERNAME', '')
+    
+    if review_only_own and github_username:
+        # Check if PR author matches our GitHub username
+        pr_author = pr.get('author', {}).get('login', '')
+        if pr_author != github_username:
+            logger.info(f"Skipping PR #{pr['number']} as it's not authored by {github_username}")
+            return False
+    
+    return True
+
+def process_pull_requests(prs_json):
+    """Process pull requests from JSON data"""
+    try:
+        prs = json.loads(prs_json)
+        logger.info(f"Processing {len(prs)} pull requests")
+        
+        # Import tasks module for enqueuing
+        tasks = import_tasks_module()
+        
+        for pr in prs:
+            pr_number = pr['number']
+            pr_title = pr['title']
+            pr_url = pr.get('url', '')
+            
+            logger.info(f"Found PR #{pr_number}: {pr_title}")
+            
+            # Check if this PR should be reviewed
+            if not should_review_pr(pr):
+                continue
+            
+            # Skip if already reviewed or being processed
+            if is_already_reviewed(pr_number):
+                continue
+            
+            # Create lock file
+            create_lock_file(pr_number)
+            
+            # Enqueue the PR for review
+            try:
+                job_id = tasks.enqueue_review_pull_request(pr_number)
+                logger.info(f"Enqueued PR #{pr_number} for review with job ID: {job_id}")
+                
+                # Add job ID to lock file
+                lock_file = os.path.join(os.environ.get('PROJECT_PATH', os.getcwd()),
+                                        '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
+                try:
+                    with open(lock_file, 'a') as f:
+                        f.write(f"Job ID: {job_id}\n")
+                except Exception as e:
+                    logger.error(f"Error updating lock file: {str(e)}")
+                
+                print(f"Enqueued PR review job with ID: {job_id}")
+            except Exception as e:
+                logger.error(f"Failed to enqueue PR #{pr_number}: {str(e)}")
+                traceback.print_exc()
+                
+                # Remove lock file on failure
+                project_path = os.environ.get('PROJECT_PATH', os.getcwd())
+                lock_file = os.path.join(project_path, '.autonomous-claude', 'reviews', f"pr-{pr_number}.lock")
+                if os.path.exists(lock_file):
+                    os.remove(lock_file)
+        
+        return True
+    except json.JSONDecodeError:
+        logger.error("Failed to parse pull requests JSON")
+        traceback.print_exc()
+        return False
+    except Exception as e:
+        logger.error(f"Error processing pull requests: {str(e)}")
+        traceback.print_exc()
+        return False
+
+def main():
+    # Read pull requests JSON from stdin
+    prs_json = sys.stdin.read()
+    
+    if not prs_json:
+        logger.warning("No input received from stdin")
+        sys.exit(1)
+    
+    if process_pull_requests(prs_json):
+        sys.exit(0)
+    else:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+EOF
+
+    log "INFO" "Created PR checker script at $PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
+    chmod +x "$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
   fi
   
   # Start worker process in the background
@@ -471,6 +774,7 @@ EOF
   export PROJECT_PATH="$PROJECT_PATH"
   export REDIS_URL="$REDIS_URL"
   export REDIS_QUEUE="$REDIS_QUEUE"
+  export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
   
   log "INFO" "Starting worker in the background..."
   python3 "$PROJECT_PATH/.autonomous-claude/worker.py" > "$PROJECT_PATH/.autonomous-claude/logs/worker_stdout.log" 2>&1 &
@@ -482,6 +786,19 @@ EOF
 check_github_issues() {
   log "INFO" "Checking GitHub issues..."
   
+  # Create and test the tasks directory
+  tasks_dir="$PROJECT_PATH/.autonomous-claude/tasks"
+  mkdir -p "$tasks_dir"
+  
+  # Verify write access to the tasks directory
+  test_file="$tasks_dir/test-access.txt"
+  echo "Testing write access at $(date)" > "$test_file"
+  if [ ! -f "$test_file" ]; then
+    log "ERROR" "Cannot write to tasks directory: $tasks_dir"
+    return 1
+  fi
+  rm -f "$test_file"
+  
   # Get the list of open issues with the specified label
   issues=$(gh issue list --repo "$GITHUB_REPO" --label "$GITHUB_ISSUE_LABEL" --state open --json number,title,url)
   
@@ -491,27 +808,124 @@ check_github_issues() {
     return 0
   fi
   
-  # Process each issue
-  echo "$issues" | python3 -c "
-import json
-import sys
-import os
-sys.path.append('$PROJECT_PATH/.autonomous-claude')
-from tasks import enqueue_process_github_issue
-
-issues = json.load(sys.stdin)
-for issue in issues:
-    # Check if this issue is already being processed
-    issue_number = issue['number']
-    task_file = os.path.join('$PROJECT_PATH', '.autonomous-claude', 'tasks', f'{issue_number}-plan.md')
+  # Log the issues found for debugging
+  log "INFO" "Found issues: $issues"
+  
+  # Use a for loop instead of piping to while to avoid subshell issues
+  issue_count=$(echo "$issues" | jq '. | length')
+  log "INFO" "Found $issue_count issues to process"
+  
+  for i in $(seq 0 $((issue_count - 1))); do
+    issue_number=$(echo "$issues" | jq -r ".[$i].number")
+    issue_title=$(echo "$issues" | jq -r ".[$i].title")
     
-    if not os.path.exists(task_file):
-        print(f'Processing issue #{issue_number}: {issue[\"title\"]}')
-        job_id = enqueue_process_github_issue(issue_number)
-        print(f'Enqueued job with ID: {job_id}')
-    else:
-        print(f'Issue #{issue_number} already has a plan, skipping')
-"
+    # Log the extracted issue info
+    log "INFO" "Extracted issue #$issue_number: $issue_title"
+    
+    # Check if this issue already has a plan or lock file
+    plan_file="$tasks_dir/${issue_number}-plan.md"
+    lock_file="$tasks_dir/${issue_number}.lock"
+    
+    log "INFO" "Checking plan file: $plan_file"
+    if [ -f "$plan_file" ]; then
+      log "INFO" "Issue #$issue_number already has a plan, skipping"
+      continue
+    fi
+    
+    log "INFO" "Checking lock file: $lock_file"
+    if [ -f "$lock_file" ]; then
+      # Check if lock file is more than 1 hour old
+      lock_time=$(stat -f "%m" "$lock_file")
+      current_time=$(date +%s)
+      age_seconds=$((current_time - lock_time))
+      
+      if [ $age_seconds -lt 3600 ]; then  # Less than 1 hour old
+        log "INFO" "Issue #$issue_number is already being processed (lock created $(($age_seconds / 60)) minutes ago)"
+        continue
+      else
+        log "INFO" "Found stale lock for issue #$issue_number, re-enqueueing"
+        rm "$lock_file"
+      fi
+    fi
+    
+    # Create a lock file
+    timestamp=$(date)
+    log "INFO" "Creating lock file for issue #$issue_number at $timestamp"
+    echo "Enqueued at $timestamp" > "$lock_file"
+    
+    if [ ! -f "$lock_file" ]; then
+      log "ERROR" "Failed to create lock file for issue #$issue_number"
+      continue
+    fi
+    
+    # Enqueue the issue using Python
+    log "INFO" "Processing issue #$issue_number: $issue_title"
+    source "$PROJECT_PATH/.autonomous-claude/venv/bin/activate"
+    
+    # Use a simpler approach to avoid subshell issues
+    cd "$PROJECT_PATH"
+    python3 -c "import sys; sys.path.append('$PROJECT_PATH/.autonomous-claude'); from tasks import enqueue_process_github_issue; print(f'Enqueued job with ID: {enqueue_process_github_issue($issue_number)}')" > "$PROJECT_PATH/.autonomous-claude/logs/enqueue_output.txt"
+    
+    # Get the job ID from the output file
+    job_id=$(cat "$PROJECT_PATH/.autonomous-claude/logs/enqueue_output.txt" | grep -o "Enqueued job with ID: .*" | sed 's/Enqueued job with ID: //')
+    
+    # Add job ID to lock file
+    echo "Job ID: $job_id" >> "$lock_file"
+    log "INFO" "Enqueued issue #$issue_number with job ID: $job_id"
+    
+    # Verify lock file contents
+    log "INFO" "Lock file contents for issue #$issue_number:"
+    cat "$lock_file" | while read line; do
+      log "INFO" "  $line"
+    done
+  done
+}
+
+check_github_prs() {
+  log "INFO" "Checking GitHub PRs..."
+  
+  # Ensure required directories exist
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
+  
+  # Get the list of open PRs
+  prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author)
+  
+  # Check if there are any PRs
+  if [ -z "$prs" ] || [ "$prs" == "[]" ]; then
+    log "INFO" "No open PRs found."
+    return 0
+  fi
+  
+  # Set necessary environment variables for the Python script
+  export PROJECT_PATH="$PROJECT_PATH"
+  export GITHUB_USERNAME="$GITHUB_USERNAME"
+  export REVIEW_ONLY_OWN_PRS="$REVIEW_ONLY_OWN_PRS"
+  export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
+  
+  # Create PR checker script if it doesn't exist
+  pr_checker_script="$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
+  if [ ! -f "$pr_checker_script" ]; then
+    log "ERROR" "PR checker script not found: $pr_checker_script"
+    return 1
+  fi
+  
+  # Make the script executable
+  chmod +x "$pr_checker_script"
+  
+  # Process PRs using the Python script
+  log "INFO" "Running GitHub PR checker script..."
+  
+  cd "$PROJECT_PATH"
+  source "$PROJECT_PATH/.autonomous-claude/venv/bin/activate"
+  echo "$prs" | python3 "$pr_checker_script"
+  script_exit=$?
+  
+  if [ $script_exit -ne 0 ]; then
+    log "ERROR" "GitHub PR checker script failed with exit code $script_exit"
+    return 1
+  fi
 }
 
 generate_documentation() {
@@ -611,6 +1025,11 @@ main_loop() {
     # Check for GitHub issues
     check_github_issues
     
+    # Check for GitHub PRs that need review
+    if [ "$PR_REVIEW_ENABLED" = "true" ]; then
+      check_github_prs
+    fi
+    
     # Sleep for the polling interval
     log "DEBUG" "Sleeping for $POLLING_INTERVAL seconds..."
     sleep $POLLING_INTERVAL
@@ -647,6 +1066,8 @@ show_status() {
     worker_pid=$(cat "$PROJECT_PATH/.autonomous-claude/worker.pid")
     if ps -p $worker_pid > /dev/null; then
       echo -e "${GREEN}Worker: Running (PID: $worker_pid)${NC}"
+      echo "Running processes:"
+      ps aux | grep -v grep | grep claude | head -n 5
     else
       echo -e "${RED}Worker: Not running (stale PID file)${NC}"
     fi
@@ -684,14 +1105,86 @@ queue = Queue('$REDIS_QUEUE', connection=redis_conn)
 print(f'Jobs in queue: {len(queue)}')
 print(f'Failed jobs: {len(queue.failed_job_registry)}')
 print(f'Completed jobs: {len(queue.finished_job_registry)}')
+
+print('\nActive jobs:')
+for job in queue.get_jobs():
+    print(f'- Job ID: {job.id} | Function: {job.func_name}')
+
+print('\nFailed jobs:')
+for job_id in queue.failed_job_registry.get_job_ids():
+    job = queue.fetch_job(job_id)
+    if job:
+        print(f'- Job ID: {job.id} | Function: {job.func_name} | Error: {job.exc_info}')
+    else:
+        print(f'- Job ID: {job_id} (details not available)')
 ")
   echo ""
   echo "Queue Status:"
   echo "$queue_info"
   
-  # Show recent logs
+  # Show active locks
   echo ""
-  echo "Recent Logs:"
+  echo "Active Tasks:"
+  if [ -d "$PROJECT_PATH/.autonomous-claude/tasks" ]; then
+    find "$PROJECT_PATH/.autonomous-claude/tasks" -name "*.lock" | while read lock_file; do
+      issue_number=$(basename "$lock_file" .lock)
+      lock_time=$(stat -f "%m" "$lock_file")
+      current_time=$(date +%s)
+      age_minutes=$(( (current_time - lock_time) / 60 ))
+      job_id=$(grep "Job ID:" "$lock_file" | cut -d ":" -f 2 | tr -d " ")
+      
+      echo "Issue #$issue_number - Started $age_minutes minutes ago - Job ID: $job_id"
+      echo "Lock file contents:"
+      cat "$lock_file" | sed 's/^/  /'
+    done
+  else
+    echo "No active tasks found"
+  fi
+  
+  # Show active PR reviews
+  echo ""
+  echo "Active PR Reviews:"
+  if [ -d "$PROJECT_PATH/.autonomous-claude/reviews" ]; then
+    find "$PROJECT_PATH/.autonomous-claude/reviews" -name "*.lock" | while read lock_file; do
+      pr_number=$(basename "$lock_file" .lock)
+      lock_time=$(stat -f "%m" "$lock_file")
+      current_time=$(date +%s)
+      age_minutes=$(( (current_time - lock_time) / 60 ))
+      job_id=$(grep "Job ID:" "$lock_file" | cut -d ":" -f 2 | tr -d " " 2>/dev/null || echo "N/A")
+      
+      echo "PR #$pr_number - Started $age_minutes minutes ago - Job ID: $job_id"
+      echo "Lock file contents:"
+      cat "$lock_file" | sed 's/^/  /'
+    done
+  fi
+  
+  # Show recent PR reviews
+  echo ""
+  echo "Recent PR Reviews:"
+  if [ -d "$PROJECT_PATH/.autonomous-claude/reviews" ]; then
+    find "$PROJECT_PATH/.autonomous-claude/reviews" -name "pr-*-review.md" | sort -r | head -n 5 | while read review_file; do
+      pr_number=$(basename "$review_file" | sed 's/pr-\(.*\)-review.md/\1/')
+      review_time=$(stat -f "%m" "$review_file")
+      review_date=$(date -r "$review_time" "+%Y-%m-%d %H:%M:%S")
+      
+      echo "PR #$pr_number - Reviewed on $review_date"
+    done
+  else
+    echo "No PR reviews found"
+  fi
+  
+  # Show recent worker logs
+  echo ""
+  echo "Recent Worker Logs:"
+  if [ -f "$PROJECT_PATH/.autonomous-claude/logs/worker.log" ]; then
+    tail -n 10 "$PROJECT_PATH/.autonomous-claude/logs/worker.log"
+  else
+    echo "No worker logs available"
+  fi
+  
+  # Show recent main logs
+  echo ""
+  echo "Recent Main Logs:"
   tail -n 5 "$LOG_FILE" 2>/dev/null || echo "No logs available"
 }
 
