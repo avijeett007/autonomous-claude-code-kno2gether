@@ -315,15 +315,80 @@ def process_github_issue(issue_number):
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"Implementation completed: {timestamp}\n")
         
+        # Step 3: Extract PR number and track relationship
+        # This attempts to find the PR number from the implementation output
+        pr_number = None
+        try:
+            # Look for a PR link in the output
+            import re
+            pr_url_pattern = r'https://github\.com/[^/]+/[^/]+/pull/(\d+)'
+            pr_number_pattern = r'Created PR #(\d+)'
+            
+            pr_url_match = re.search(pr_url_pattern, result['stdout'])
+            pr_number_match = re.search(pr_number_pattern, result['stdout'])
+            
+            if pr_url_match:
+                pr_number = pr_url_match.group(1)
+                logger.info(f"Found PR number from URL: {pr_number}")
+            elif pr_number_match:
+                pr_number = pr_number_match.group(1)
+                logger.info(f"Found PR number from text: {pr_number}")
+            
+            if pr_number:
+                # Import PR relationship module
+                try:
+                    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+                    from pr_issue_relationship import get_instance
+                    
+                    # Associate PR with issue
+                    relationship_manager = get_instance()
+                    relationship_manager.associate_pr_with_issue(issue_number, pr_number)
+                    
+                    logger.info(f"Associated PR #{pr_number} with issue #{issue_number}")
+                    
+                    # Update lock file with PR information
+                    with open(lock_file, 'a') as f:
+                        f.write(f"PR created: #{pr_number}\n")
+                    
+                    # Step 4: Trigger PR review if auto-review is enabled
+                    auto_review = os.environ.get('PR_AUTO_REVIEW', 'true').lower() == 'true'
+                    if auto_review:
+                        logger.info(f"Triggering auto-review for PR #{pr_number}")
+                        
+                        # Add a delay to allow GitHub to process the PR
+                        time.sleep(10)
+                        
+                        # Import tasks module
+                        from tasks import enqueue_review_pull_request
+                        
+                        # Enqueue PR review
+                        job_id = enqueue_review_pull_request(pr_number)
+                        logger.info(f"Enqueued PR review job with ID: {job_id}")
+                        
+                        # Update lock file with review information
+                        with open(lock_file, 'a') as f:
+                            f.write(f"Auto-review triggered: job ID {job_id}\n")
+                except ImportError as e:
+                    logger.error(f"Failed to import PR relationship module: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to associate PR with issue: {str(e)}")
+            else:
+                logger.warning(f"No PR number found in implementation output for issue #{issue_number}")
+        except Exception as e:
+            logger.error(f"Error extracting PR number from output: {str(e)}")
+        
         # Create a note to indicate successful completion
         completion_file = os.path.join(tasks_dir, f"{issue_number}-completed.txt")
         with open(completion_file, 'w') as f:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"Issue #{issue_number} fully processed at {timestamp}\n")
+            if pr_number:
+                f.write(f"PR created: #{pr_number}\n")
         
         return {
             'success': True,
             'issue_number': issue_number,
+            'pr_number': pr_number,
             'completed_at': time.time()
         }
     except Exception as e:
@@ -381,10 +446,43 @@ def review_pull_request(pr_number):
             timestamp = datetime.now().isoformat()
             f.write(f"Review started: {timestamp}\n")
     
-    # Check if a review already exists
+    # Import PR relationship module
+    try:
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from pr_issue_relationship import get_instance
+        relationship_manager = get_instance()
+        
+        # Update review status to in_progress
+        relationship_manager.update_pr_review_status(pr_number, 'in_progress')
+        logger.info(f"Updated PR review status to in_progress for PR #{pr_number}")
+    except ImportError as e:
+        logger.warning(f"Failed to import PR relationship module: {str(e)}")
+        relationship_manager = None
+    except Exception as e:
+        logger.warning(f"Failed to update PR review status: {str(e)}")
+        relationship_manager = None
+    
+    # Check if a review already exists and if we should re-review
     review_file = os.path.join(reviews_dir, f"pr-{pr_number}-review.md")
-    if os.path.exists(review_file):
-        logger.info(f"Review already exists for PR #{pr_number}, skipping")
+    should_review = True
+    
+    # Check with relationship manager if PR should be reviewed
+    if relationship_manager:
+        try:
+            should_review = relationship_manager.should_review_pr(pr_number)
+            logger.info(f"Relationship manager: should review PR #{pr_number}? {should_review}")
+        except Exception as e:
+            logger.warning(f"Failed to check should_review_pr: {str(e)}")
+            # Default to reviewing if we can't determine
+            should_review = True
+    elif os.path.exists(review_file):
+        # Fall back to simple file check if relationship manager isn't available
+        logger.info(f"Review already exists for PR #{pr_number}, using simple file check")
+        should_review = False
+    
+    # Skip if we shouldn't review
+    if not should_review:
+        logger.info(f"Skipping review for PR #{pr_number} based on status check")
         # Remove lock file
         try:
             os.remove(lock_file)
@@ -405,14 +503,24 @@ def review_pull_request(pr_number):
         "Bash(gh:*,git:*) Edit Run"
     )
     
-    # Remove lock file after processing, regardless of success
-    try:
-        os.remove(lock_file)
-    except:
-        logger.warning(f"Failed to remove lock file for PR #{pr_number}")
-    
+    # Process result
     if not result['success']:
         logger.error(f"Failed to review PR #{pr_number}")
+        
+        # Update review status to failed if relationship manager is available
+        if relationship_manager:
+            try:
+                relationship_manager.update_pr_review_status(pr_number, 'failed')
+                logger.info(f"Updated PR review status to failed for PR #{pr_number}")
+            except Exception as e:
+                logger.warning(f"Failed to update PR review status to failed: {str(e)}")
+        
+        # Remove lock file
+        try:
+            os.remove(lock_file)
+        except:
+            logger.warning(f"Failed to remove lock file for PR #{pr_number}")
+        
         return {
             'success': False,
             'stage': 'review',
@@ -422,14 +530,50 @@ def review_pull_request(pr_number):
     logger.info(f"Successfully reviewed PR #{pr_number}")
     
     # Check if review file was created
+    review_id = None
     if os.path.exists(review_file):
         logger.info(f"Review file created for PR #{pr_number}")
+        
+        # Add review record in relationship manager
+        if relationship_manager:
+            try:
+                # Read review file content
+                with open(review_file, 'r') as f:
+                    review_content = f.read()
+                
+                # Save review to history
+                review_data = {
+                    'content': review_content,
+                    'timestamp': datetime.now().isoformat(),
+                    'file_path': review_file
+                }
+                
+                # Add review record and get review ID
+                review_id = relationship_manager.add_review_record(pr_number, review_data)
+                logger.info(f"Added review record for PR #{pr_number} with ID {review_id}")
+            except Exception as e:
+                logger.warning(f"Failed to add review record: {str(e)}")
     else:
         logger.warning(f"Review file not created for PR #{pr_number}")
+    
+    # Update PR review status to completed if relationship manager is available
+    if relationship_manager:
+        try:
+            relationship_manager.update_pr_review_status(pr_number, 'completed', review_id)
+            logger.info(f"Updated PR review status to completed for PR #{pr_number}")
+        except Exception as e:
+            logger.warning(f"Failed to update PR review status to completed: {str(e)}")
+    
+    # Remove lock file
+    try:
+        os.remove(lock_file)
+    except:
+        logger.warning(f"Failed to remove lock file for PR #{pr_number}")
     
     return {
         'success': True,
         'pr_number': pr_number,
+        'review_id': review_id,
         'completed_at': time.time()
     }
 

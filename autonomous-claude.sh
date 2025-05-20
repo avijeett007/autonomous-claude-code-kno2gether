@@ -27,6 +27,7 @@ CONFIG_FILE="$PROJECT_PATH/.autonomous-claude/config.sh"
 REDIS_URL="redis://localhost:6379"
 REDIS_QUEUE="autonomous-coding"
 PR_REVIEW_ENABLED=true
+PR_AUTO_REVIEW=true  # Auto-review PR after creation
 REVIEW_ONLY_OWN_PRS=true
 GITHUB_USERNAME=""
 
@@ -146,6 +147,7 @@ init_project() {
   mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/templates"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
   mkdir -p "$DOCS_PATH"
   
   # Check if CLAUDE.md exists, if not create it
@@ -188,6 +190,7 @@ REDIS_QUEUE="autonomous-coding"
 
 # PR review settings
 PR_REVIEW_ENABLED=true
+PR_AUTO_REVIEW=true  # Automatically review PR after creation
 REVIEW_ONLY_OWN_PRS=true
 
 # Paths
@@ -771,6 +774,7 @@ EOF
   export PROJECT_PATH="$PROJECT_PATH"
   export REDIS_URL="$REDIS_URL"
   export REDIS_QUEUE="$REDIS_QUEUE"
+  export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
   
   log "INFO" "Starting worker in the background..."
   python3 "$PROJECT_PATH/.autonomous-claude/worker.py" > "$PROJECT_PATH/.autonomous-claude/logs/worker_stdout.log" 2>&1 &
@@ -880,9 +884,10 @@ check_github_issues() {
 check_github_prs() {
   log "INFO" "Checking GitHub PRs..."
   
-  # Ensure tasks and reviews directories exist
+  # Ensure required directories exist
   mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
   
   # Get the list of open PRs
   prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author)
@@ -897,6 +902,7 @@ check_github_prs() {
   export PROJECT_PATH="$PROJECT_PATH"
   export GITHUB_USERNAME="$GITHUB_USERNAME"
   export REVIEW_ONLY_OWN_PRS="$REVIEW_ONLY_OWN_PRS"
+  export PR_AUTO_REVIEW="$PR_AUTO_REVIEW"
   
   # Create PR checker script if it doesn't exist
   pr_checker_script="$PROJECT_PATH/.autonomous-claude/github_pr_checker.py"
