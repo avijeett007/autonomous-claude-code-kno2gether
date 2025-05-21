@@ -1,19 +1,4 @@
 import os
-
-
-def format_allowed_tools(tools_str):
-    """Format the allowed tools parameter for Claude CLI
-    
-    The Claude CLI expects --allowed-tools to be comma-separated, not space-separated
-    """
-    if not tools_str:
-        return tools_str
-        
-    # If it contains spaces but no commas, convert spaces to commas
-    if ' ' in tools_str and ',' not in tools_str:
-        return tools_str.replace(' ', ',')
-    return tools_str
-
 import sys
 import json
 import time
@@ -200,16 +185,23 @@ def run_claude_code_headless(prompt, allowed_tools=None, max_retries=3, retry_de
             
             # Run Claude in print mode with the instruction file
             file_prompt = f"Read and execute the instructions in this file: {instruction_file}"
-            command = [claude_path, '-p', file_prompt, '--dangerously-skip-permissions']
+            command = [claude_path, '-p', file_prompt]
             
-            # Keep the allowed_tools parameter in context variable but don't use it in command
-            # We're always using dangerously-skip-permissions now by user request
+            # Either use allowed_tools (more secure) or dangerously-skip-permissions (less secure)
+            if allowed_tools:
+                command.extend(['--allowed-tools', allowed_tools])
+            else:
+                command.append('--dangerously-skip-permissions')
         else:
             # Direct execution of prompt
-            command = [claude_path, '-p', prompt, '--dangerously-skip-permissions']
+            command = [claude_path, '-p', prompt]
             command_type = 'direct-prompt'
             
-            # Always use dangerously-skip-permissions for reliable execution
+            # Either use allowed_tools (more secure) or dangerously-skip-permissions (less secure)
+            if allowed_tools:
+                command.extend(['--allowed-tools', allowed_tools])
+            else:
+                command.append('--dangerously-skip-permissions')
             
             logger.info(f"Running Claude Code with direct prompt")
     except Exception as e:
@@ -262,9 +254,7 @@ def run_claude_code_headless(prompt, allowed_tools=None, max_retries=3, retry_de
                 # Exponential backoff for next retry
                 current_delay = min(current_delay * 2, 300)  # Cap at 5 minutes
             else:
-                # We're now always using the dangerous flag, no need for fallback logic
-                
-                # No more retries, and dangerous mode also failed (or wasn't tried), report final failure
+                # No more retries, report final failure
                 logger.error(f"Claude Code execution failed after {max_retries} retries: {e}")
                 return {
                     'success': False,
@@ -284,8 +274,63 @@ def run_claude_code_headless(prompt, allowed_tools=None, max_retries=3, retry_de
                 # Exponential backoff for next retry
                 current_delay = min(current_delay * 2, 300)  # Cap at 5 minutes
             else:
-                # We're now always using the dangerous flag directly, no need for fallback logic
+                logger.error(f"Error running Claude Code after {max_retries} retries: {str(e)}")
+                return {
+                    'success': False,
+                    'stdout': '',
+                    'stderr': str(e),
+                    'command_type': command_type,
+                    'instruction_file': instruction_file,
+                    'retries': retries
+                }
+            process = subprocess.run(command, capture_output=True, text=True, check=True)
+            
+            stdout = process.stdout
+            stderr = process.stderr
+            
+            # Success! Return the result
+            return {
+                'success': True,
+                'stdout': stdout,
+                'stderr': stderr,
+                'command_type': command_type,
+                'instruction_file': instruction_file,
+                'retries': retries
+            }
                 
+        except subprocess.CalledProcessError as e:
+            stderr_output = e.stderr if hasattr(e, 'stderr') else str(e)
+            stdout_output = e.stdout if hasattr(e, 'stdout') else ''
+            
+            # If we have retries left, wait and try again
+            if retries < max_retries:
+                retries += 1
+                logger.warning(f"Claude Code execution failed (attempt {retries}): {e}")
+                logger.warning(f"Waiting {current_delay} seconds before retrying...")
+                time.sleep(current_delay)
+                # Exponential backoff for next retry
+                current_delay = min(current_delay * 2, 300)  # Cap at 5 minutes
+            else:
+                # No more retries, report final failure
+                logger.error(f"Claude Code execution failed after {max_retries} retries: {e}")
+                return {
+                    'success': False,
+                    'stdout': stdout_output,
+                    'stderr': stderr_output,
+                    'command_type': command_type,
+                    'instruction_file': instruction_file,
+                    'retries': retries
+                }
+        except Exception as e:
+            # For other exceptions, also implement retry
+            if retries < max_retries:
+                retries += 1
+                logger.warning(f"Error running Claude Code (attempt {retries}): {str(e)}")
+                logger.warning(f"Waiting {current_delay} seconds before retrying...")
+                time.sleep(current_delay)
+                # Exponential backoff for next retry
+                current_delay = min(current_delay * 2, 300)  # Cap at 5 minutes
+            else:
                 logger.error(f"Error running Claude Code after {max_retries} retries: {str(e)}")
                 return {
                     'success': False,
@@ -300,11 +345,12 @@ def run_claude_code_headless(prompt, allowed_tools=None, max_retries=3, retry_de
     return {
         'success': False,
         'stdout': '',
-        'stderr': 'Unexpected exit from retry loop',
+        'stderr': 'Unexpected error in retry loop',
         'command_type': command_type,
         'instruction_file': instruction_file,
         'retries': retries
     }
+
 def process_github_issue(issue_number):
     """Process a GitHub issue through the autonomous workflow"""
     logger.info(f"Processing GitHub issue #{issue_number}")

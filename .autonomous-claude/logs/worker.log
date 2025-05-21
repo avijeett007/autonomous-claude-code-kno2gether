@@ -1,6 +1,157 @@
-2025-05-19 21:13:23,896 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
-2025-05-19 21:20:21,894 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
-2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
-2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
-2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
-2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
+2025-05-19 22:36:40,619 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 22:36:41,228 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:36:41,228 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:36:41,230 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:36:41,230 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:39:20,897 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 22:39:21,494 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:39:21,494 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:39:21,496 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:39:21,496 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:41:54,120 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 22:41:54,691 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:41:54,691 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 22:41:54,693 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:41:54,693 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:44:21,186 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:44:21,186 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:44:21,189 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-19 22:44:21,189 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-19 22:44:21,192 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:implement-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:44:21,192 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:implement-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:47:10,456 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:47:10,456 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:47:10,460 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-19 22:47:10,460 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-19 22:47:10,463 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:implement-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:47:10,463 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:implement-github-issue 1 --dangerously-skip-permissions
+2025-05-19 22:56:10,529 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:56:10,529 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-19 22:56:10,531 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-19 22:56:10,531 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-19 23:07:01,334 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 23:46:15,481 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 23:46:15,972 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:46:15,972 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:46:15,974 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-19 23:46:15,974 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-19 23:54:18,171 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 23:54:18,219 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:54:18,219 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:54:18,221 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-19 23:54:18,221 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-19 23:56:32,037 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-19 23:56:32,083 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:56:32,083 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-19 23:56:32,085 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-19 23:56:32,085 - autonomous-claude-worker - INFO - Running Claude Code with custom command in interactive mode: /project:analyze-github-issue 1
+2025-05-20 00:40:03,620 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-20 00:40:03,681 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:40:03,681 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:40:04,045 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:40:04,045 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:40:04,046 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004003.md
+2025-05-20 00:40:04,046 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004003.md
+2025-05-20 00:40:04,048 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004003.md --dangerously-skip-permissions
+2025-05-20 00:40:04,048 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004003.md --dangerously-skip-permissions
+2025-05-20 00:43:40,698 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:43:40,698 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:43:40,702 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:43:40,702 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:43:40,705 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:43:40,705 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:43:40,708 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004340.md
+2025-05-20 00:43:40,708 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004340.md
+2025-05-20 00:43:40,715 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004340.md --dangerously-skip-permissions
+2025-05-20 00:43:40,715 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004340.md --dangerously-skip-permissions
+2025-05-20 00:45:28,784 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-20 00:45:29,361 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:45:29,361 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:45:29,756 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:45:29,756 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:45:29,759 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004529.md
+2025-05-20 00:45:29,759 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004529.md
+2025-05-20 00:45:29,761 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004529.md --dangerously-skip-permissions
+2025-05-20 00:45:29,761 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-004529.md --dangerously-skip-permissions
+2025-05-20 00:49:19,023 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:49:19,023 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:49:19,026 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:49:19,026 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:49:19,033 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:49:19,033 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:49:19,043 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004919.md
+2025-05-20 00:49:19,043 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004919.md
+2025-05-20 00:49:19,053 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004919.md --dangerously-skip-permissions
+2025-05-20 00:49:19,053 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-004919.md --dangerously-skip-permissions
+2025-05-20 00:49:43,977 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-20 00:50:30,117 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:50:30,117 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 00:50:30,120 - autonomous-claude-worker - INFO - Created/updated lock file for issue #1
+2025-05-20 00:50:30,120 - autonomous-claude-worker - INFO - Created/updated lock file for issue #1
+2025-05-20 00:50:30,491 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:50:30,491 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 00:50:30,493 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-005030.md
+2025-05-20 00:50:30,493 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-005030.md
+2025-05-20 00:50:30,495 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-005030.md --dangerously-skip-permissions
+2025-05-20 00:50:30,495 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-005030.md --dangerously-skip-permissions
+2025-05-20 00:52:22,832 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:52:22,832 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:52:22,835 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:52:22,835 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 00:52:22,841 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:52:22,841 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 00:52:22,849 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-005222.md
+2025-05-20 00:52:22,849 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-005222.md
+2025-05-20 00:52:22,858 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-005222.md --dangerously-skip-permissions
+2025-05-20 00:52:22,858 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-005222.md --dangerously-skip-permissions
+2025-05-20 00:52:41,025 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:52:41,025 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:52:41,027 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 00:52:41,027 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 00:54:34,936 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:54:34,936 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 00:54:34,939 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 00:54:34,939 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 01:01:32,459 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:01:32,459 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:01:32,462 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 01:01:32,462 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 01:01:32,559 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 01:01:32,559 - autonomous-claude-worker - INFO - Processing GitHub issue #1
+2025-05-20 01:01:32,562 - autonomous-claude-worker - INFO - Created/updated lock file for issue #1
+2025-05-20 01:01:32,562 - autonomous-claude-worker - INFO - Created/updated lock file for issue #1
+2025-05-20 01:01:32,962 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:01:32,962 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:01:32,965 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-010132.md
+2025-05-20 01:01:32,965 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-010132.md
+2025-05-20 01:01:32,966 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-010132.md --dangerously-skip-permissions
+2025-05-20 01:01:32,966 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-010132.md --dangerously-skip-permissions
+2025-05-20 01:04:45,552 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:04:45,552 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:04:45,555 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 01:04:45,555 - autonomous-claude-worker - INFO - Successfully analyzed issue #1
+2025-05-20 01:04:45,560 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 01:04:45,560 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: implement-github-issue
+2025-05-20 01:04:45,566 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-010445.md
+2025-05-20 01:04:45,566 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-010445.md
+2025-05-20 01:04:45,573 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-010445.md --dangerously-skip-permissions
+2025-05-20 01:04:45,573 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/implement-github-issue-20250520-010445.md --dangerously-skip-permissions
+2025-05-20 01:21:20,462 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:21:20,462 - autonomous-claude-worker - INFO - Claude Code execution successful
+2025-05-20 01:21:20,465 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 01:21:20,465 - autonomous-claude-worker - INFO - Successfully implemented solution for issue #1
+2025-05-20 01:21:20,470 - autonomous-claude-worker - WARNING - No PR number found in implementation output for issue #1
+2025-05-20 01:21:20,470 - autonomous-claude-worker - WARNING - No PR number found in implementation output for issue #1
+2025-05-20 01:25:01,738 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+2025-05-20 01:25:01,798 - autonomous-claude-worker - INFO - Processing GitHub issue #999
+2025-05-20 01:25:01,798 - autonomous-claude-worker - INFO - Processing GitHub issue #999
+2025-05-20 01:25:01,800 - autonomous-claude-worker - INFO - Created/updated lock file for issue #999
+2025-05-20 01:25:01,800 - autonomous-claude-worker - INFO - Created/updated lock file for issue #999
+2025-05-20 01:25:02,165 - autonomous-claude-worker - ERROR - Failed to get issue details: Command '['gh', 'issue', 'view', '999', '--json', 'title,body,number,url']' returned non-zero exit status 1.
+2025-05-20 01:25:02,165 - autonomous-claude-worker - ERROR - Failed to get issue details: Command '['gh', 'issue', 'view', '999', '--json', 'title,body,number,url']' returned non-zero exit status 1.
+2025-05-20 01:25:02,167 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:25:02,167 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:25:02,169 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md
+2025-05-20 01:25:02,169 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md
+2025-05-20 01:25:02,170 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md --dangerously-skip-permissions
+2025-05-20 01:25:02,170 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md --dangerously-skip-permissions

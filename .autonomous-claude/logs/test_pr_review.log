@@ -1,0 +1,72 @@
+2025-05-20 01:19:27,779 - github-api-helper - ERROR - GitHub API error, max retries exceeded: unknown command "nonexistent-command" for "gh"
+
+Usage:  gh <command> <subcommand> [flags]
+
+Available commands:
+  alias
+  api
+  attestation
+  auth
+  browse
+  cache
+  co
+  codespace
+  completion
+  config
+  extension
+  gist
+  gpg-key
+  issue
+  label
+  org
+  pr
+  project
+  release
+  repo
+  ruleset
+  run
+  search
+  secret
+  ssh-key
+  status
+  variable
+  workflow
+
+
+2025-05-20 01:19:27,809 - github-pr-update-detector - INFO - PR #999 not found in relationship tracking, skipping
+2025-05-20 01:20:28,260 - github-api-helper - ERROR - GitHub API error, max retries exceeded: unknown command "nonexistent-command" for "gh"
+
+Usage:  gh <command> <subcommand> [flags]
+
+Available commands:
+  alias
+  api
+  attestation
+  auth
+  browse
+  cache
+  co
+  codespace
+  completion
+  config
+  extension
+  gist
+  gpg-key
+  issue
+  label
+  org
+  pr
+  project
+  release
+  repo
+  ruleset
+  run
+  search
+  secret
+  ssh-key
+  status
+  variable
+  workflow
+
+
+2025-05-20 01:20:28,272 - github-pr-update-detector - INFO - PR #999 not found in relationship tracking, skipping

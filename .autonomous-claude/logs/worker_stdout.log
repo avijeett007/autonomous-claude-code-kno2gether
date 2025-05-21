@@ -1,10 +1,23 @@
-2025-05-19 21:20:21,894 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
-21:20:21 Worker rq:worker:dd17eb21380b46789bfbabc55f380b9b started with PID 95905, version 2.3.3
-21:20:21 Subscribing to channel rq:pubsub:dd17eb21380b46789bfbabc55f380b9b
-21:20:21 *** Listening on autonomous-coding...
-21:20:21 Cleaning registries for queue: autonomous-coding
-21:20:21 autonomous-coding: worker.process_github_issue(1) (1e3a7a62-fd7c-4917-8a86-601437ed06e7)
-2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
-2025-05-19 21:20:21,949 - autonomous-claude-worker - INFO - Processing GitHub issue #1
-2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
-2025-05-19 21:20:21,951 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p /project:analyze-github-issue 1 --allowedTools Bash(gh:*) Edit Run
+2025-05-20 01:25:01,738 - autonomous-claude-worker - INFO - Starting worker for queue: autonomous-coding
+01:25:01 Worker rq:worker:75701857f2c2439e95c54b3e4d5316ee started with PID 64620, version 2.3.3
+01:25:01 Subscribing to channel rq:pubsub:75701857f2c2439e95c54b3e4d5316ee
+01:25:01 *** Listening on autonomous-coding...
+01:25:01 Cleaning registries for queue: autonomous-coding
+01:25:01 autonomous-coding: worker.process_github_issue(999) (6408b623-1b56-430e-966a-2a31f314a8bd)
+2025-05-20 01:25:01,798 - autonomous-claude-worker - INFO - Processing GitHub issue #999
+2025-05-20 01:25:01,798 - autonomous-claude-worker - INFO - Processing GitHub issue #999
+2025-05-20 01:25:01,800 - autonomous-claude-worker - INFO - Created/updated lock file for issue #999
+2025-05-20 01:25:01,800 - autonomous-claude-worker - INFO - Created/updated lock file for issue #999
+GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)
+2025-05-20 01:25:02,165 - autonomous-claude-worker - ERROR - Failed to get issue details: Command '['gh', 'issue', 'view', '999', '--json', 'title,body,number,url']' returned non-zero exit status 1.
+2025-05-20 01:25:02,165 - autonomous-claude-worker - ERROR - Failed to get issue details: Command '['gh', 'issue', 'view', '999', '--json', 'title,body,number,url']' returned non-zero exit status 1.
+2025-05-20 01:25:02,167 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:25:02,167 - autonomous-claude-worker - INFO - Running Claude Code with file-based instructions for: analyze-github-issue
+2025-05-20 01:25:02,169 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md
+2025-05-20 01:25:02,169 - autonomous-claude-worker - INFO - Instruction file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md
+2025-05-20 01:25:02,170 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md --dangerously-skip-permissions
+2025-05-20 01:25:02,170 - autonomous-claude-worker - INFO - Running Claude Code with command: /usr/local/bin/claude -p Read and execute the instructions in this file: /Users/avijitsarkar/personal_projects/autonomous-claude/.autonomous-claude/instructions/analyze-github-issue-20250520-012501.md --dangerously-skip-permissions
+01:28:11 Worker 75701857f2c2439e95c54b3e4d5316ee [PID 64620]: warm shut down requested
+01:30:59 Cold shut down
+01:30:59 Killed horse pid 64649
+01:30:59 Unsubscribing from channel rq:pubsub:75701857f2c2439e95c54b3e4d5316ee

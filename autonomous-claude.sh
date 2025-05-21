@@ -147,26 +147,112 @@ check_requirements() {
 init_project() {
   log "INFO" "Initializing project: $PROJECT_PATH"
   
-  # Create required directories
+  # Create necessary directories
+  mkdir -p "$PROJECT_PATH/.autonomous-claude"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/logs"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/templates"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/instructions"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
   mkdir -p "$DOCS_PATH"
   
+  # Determine the original installation directory
+  SCRIPT_PATH=$(realpath "$0")
+  INSTALL_DIR=$(dirname "$SCRIPT_PATH")
+  
+  # Link code files from the original installation, but keep data directories separate
+  log "INFO" "Creating symlinks to core code files..."
+  
+  # Create symlinks for code files in the source installation's .autonomous-claude directory
+  SRC_DIR="$INSTALL_DIR/.autonomous-claude"
+  if [ -d "$SRC_DIR" ]; then
+    # Link Python modules (but only code files, not project-specific data)
+    for pyfile in "$SRC_DIR"/*.py; do
+      if [ -f "$pyfile" ]; then
+        FILENAME=$(basename "$pyfile")
+        # Skip any Python files that might contain project-specific data
+        if [[ "$FILENAME" != *"_data.py" && "$FILENAME" != *"_cache.py" ]]; then
+          TARGET="$PROJECT_PATH/.autonomous-claude/$FILENAME"
+          if [ ! -e "$TARGET" ]; then
+            ln -sf "$pyfile" "$TARGET"
+            log "INFO" "Linked $FILENAME from source installation"
+          fi
+        fi
+      fi
+    done
+    
+    # Link template files (but not project-specific ones)
+    if [ -d "$SRC_DIR/templates" ]; then
+      for template in "$SRC_DIR/templates"/*; do
+        if [ -f "$template" ]; then
+          FILENAME=$(basename "$template")
+          # Only link generic templates
+          if [[ "$FILENAME" == "*_template.md" || "$FILENAME" == "*_format.md" ]]; then
+            TARGET="$PROJECT_PATH/.autonomous-claude/templates/$FILENAME"
+            if [ ! -e "$TARGET" ]; then
+              ln -sf "$template" "$TARGET"
+              log "INFO" "Linked template: $FILENAME from source installation"
+            fi
+          fi
+        fi
+      done
+    fi
+    
+    # Important: Create a unique project identifier in each project to ensure task isolation
+    PROJECT_ID_FILE="$PROJECT_PATH/.autonomous-claude/project_id"
+    if [ ! -f "$PROJECT_ID_FILE" ]; then
+      # Create a unique project ID based on the absolute path hash
+      PROJECT_ID=$(echo "$PROJECT_PATH" | shasum -a 256 | cut -c1-16)
+      echo "$PROJECT_ID" > "$PROJECT_ID_FILE"
+      log "INFO" "Created unique project ID: $PROJECT_ID"
+    fi
+  else
+    log "WARNING" "Source installation directory not found: $SRC_DIR"
+    log "INFO" "Creating core files from embedded templates"
+    # If we can't find the source installation directory, fall back to copying templates
+    start_redis_worker
+  fi
+  
   # Check if CLAUDE.md exists, if not create it
   if [ ! -f "$PROJECT_PATH/CLAUDE.md" ]; then
-    log "INFO" "CLAUDE.md not found, initializing with Claude Code..."
-    $CLAUDE_CODE_PATH /init
+    cat > "$PROJECT_PATH/CLAUDE.md" << EOF
+# CLAUDE.md
+
+This file contains instructions for Claude Code to follow when working on this project.
+
+## Project Overview
+
+[Provide a brief description of the project here]
+
+## Project Structure
+
+[Describe the organization of the codebase]
+
+## Dependencies
+
+[List the main dependencies and technologies used]
+
+## Coding Conventions
+
+[Describe any coding conventions to follow]
+
+## Pull Request Guidelines
+
+[Provide guidelines for creating and reviewing PRs]
+
+## Testing Guidelines
+
+[Describe how to test changes]
+
+## Additional Resources
+
+[Link to documentation or other resources]
+EOF
+
+    log "INFO" "Created CLAUDE.md file with project guidelines"
   fi
-  
-  # Check if .claude directory exists, if not create it
-  if [ ! -d "$PROJECT_PATH/.claude" ]; then
-    log "INFO" ".claude directory not found, creating..."
-    mkdir -p "$PROJECT_PATH/.claude/commands"
-  fi
-  
+
   # Create config file if it doesn't exist
   if [ ! -f "$CONFIG_FILE" ]; then
     log "INFO" "Creating default configuration file..."
@@ -211,7 +297,8 @@ MCP_SERVERS_ENABLED=true
 # Add any custom MCP servers here
 # Example: MCP_SERVER_GITHUB="docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN=\$GITHUB_TOKEN ghcr.io/github/github-mcp-server"
 EOF
-    log "INFO" "Created default configuration file at $CONFIG_FILE"
+
+    log "INFO" "Created config file at $CONFIG_FILE"
   fi
   
   # Create custom Claude commands
@@ -223,8 +310,11 @@ EOF
 create_claude_commands() {
   log "INFO" "Creating custom Claude commands..."
   
+  # Make sure commands directory exists
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/commands"
+  
   # Command: Generate comprehensive project documentation
-  cat > "$PROJECT_PATH/.claude/commands/document-project.md" << EOF
+  cat > "$PROJECT_PATH/.autonomous-claude/commands/document-project.md" << EOF
 This command will scan through the codebase and generate comprehensive documentation for the project.
 
 Follow these steps:
@@ -241,7 +331,7 @@ All documentation should be written in Markdown format and saved to the docs dir
 EOF
 
   # Command: Analyze GitHub issue
-  cat > "$PROJECT_PATH/.claude/commands/analyze-github-issue.md" << EOF
+  cat > "$PROJECT_PATH/.autonomous-claude/commands/analyze-github-issue.md" << EOF
 This command will analyze a GitHub issue and prepare a detailed plan for implementation.
 
 The argument should be the GitHub issue number.
@@ -264,7 +354,7 @@ The plan should include:
 EOF
 
   # Command: Implement GitHub issue
-  cat > "$PROJECT_PATH/.claude/commands/implement-github-issue.md" << EOF
+  cat > "$PROJECT_PATH/.autonomous-claude/commands/implement-github-issue.md" << EOF
 This command will implement a solution for a GitHub issue based on the previously generated plan.
 
 The argument should be the GitHub issue number.
@@ -288,7 +378,7 @@ Be sure to:
 EOF
 
   # Command: Review PR
-  cat > "$PROJECT_PATH/.claude/commands/review-pull-request.md" << EOF
+  cat > "$PROJECT_PATH/.autonomous-claude/commands/review-pull-request.md" << EOF
 This command will review a GitHub pull request and provide detailed feedback.
 
 The argument should be the GitHub PR number.
@@ -331,8 +421,9 @@ import sys
 import json
 import time
 import subprocess
+from datetime import datetime, timedelta
 from redis import Redis
-from rq import Worker, Queue, Connection
+from rq import Worker, Queue
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -360,84 +451,390 @@ redis_conn = Redis.from_url(redis_url)
 queue = Queue(queue_name, connection=redis_conn)
 
 # Task processing functions
+def create_instruction_file(command_type, issue_or_pr_number=None, prompt=None):
+    """Create an instruction file for Claude Code to read"""
+    instructions_dir = os.path.join(os.getcwd(), '.autonomous-claude', 'instructions')
+    os.makedirs(instructions_dir, exist_ok=True)
+    
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    file_path = os.path.join(instructions_dir, f"{command_type}-{timestamp}.md")
+    
+    # Base instructions
+    instructions = ["# Instructions for Claude Code\n"]
+    
+    if command_type == 'analyze-github-issue':
+        # Get issue details using GitHub CLI
+        try:
+            issue_json = subprocess.check_output(
+                ['gh', 'issue', 'view', issue_or_pr_number, '--json', 'title,body,number,url'],
+                text=True
+            )
+            issue_data = json.loads(issue_json)
+            
+            instructions.append(f"## Analyze GitHub Issue #{issue_data['number']}\n")
+            instructions.append(f"**Title**: {issue_data['title']}\n")
+            instructions.append(f"**URL**: {issue_data['url']}\n")
+            instructions.append("**Description**:\n")
+            instructions.append(f"{issue_data['body']}\n\n")
+            
+            instructions.append("## Your Task\n")
+            instructions.append("1. Analyze the GitHub issue described above\n")
+            instructions.append("2. Create a plan for implementing a solution\n")
+            instructions.append("3. Save your analysis and plan to a file named `tasks/{issue_number}-plan.md` where {issue_number} is the GitHub issue number\n")
+            instructions.append("4. The plan should include detailed steps for implementation\n")
+            instructions.append("\nYou have full access to examine the codebase, run commands, and create files.\n")
+            
+        except Exception as e:
+            logger.error(f"Failed to get issue details: {str(e)}")
+            instructions.append(f"## Analyze GitHub Issue #{issue_or_pr_number}\n")
+            instructions.append("Could not fetch issue details. Please use GitHub CLI to get the issue information.\n")
+    
+    elif command_type == 'implement-github-issue':
+        instructions.append(f"## Implement Solution for GitHub Issue #{issue_or_pr_number}\n")
+        instructions.append("1. Read the analysis and plan from the previous step\n")
+        instructions.append(f"2. Check if the file `tasks/{issue_or_pr_number}-plan.md` exists and read it\n")
+        instructions.append("3. Implement the solution according to the plan\n")
+        instructions.append("4. Create or modify necessary files\n")
+        instructions.append("5. Test your implementation\n")
+        instructions.append("6. Create a PR with your changes\n")
+        instructions.append("\nYou have full access to examine the codebase, run commands, create files, and make changes.\n")
+    
+    elif command_type == 'document-project':
+        instructions.append("## Update Project Documentation\n")
+        instructions.append("1. Examine the codebase to understand its structure and functionality\n")
+        instructions.append("2. Update or create documentation files in the `docs/` directory\n")
+        instructions.append("3. Make sure to document the following:\n")
+        instructions.append("   - Project overview\n")
+        instructions.append("   - Installation instructions\n")
+        instructions.append("   - Usage examples\n")
+        instructions.append("   - API reference (if applicable)\n")
+        instructions.append("   - Component descriptions\n")
+        instructions.append("\nYou have full access to examine the codebase, run commands, and create or modify documentation files.\n")
+    
+    elif command_type == 'review-pull-request':
+        # Get PR details using GitHub CLI
+        try:
+            pr_json = subprocess.check_output(
+                ['gh', 'pr', 'view', issue_or_pr_number, '--json', 'title,body,number,url,files'],
+                text=True
+            )
+            pr_data = json.loads(pr_json)
+            
+            instructions.append(f"## Review Pull Request #{pr_data['number']}\n")
+            instructions.append(f"**Title**: {pr_data['title']}\n")
+            instructions.append(f"**URL**: {pr_data['url']}\n")
+            instructions.append("**Description**:\n")
+            instructions.append(f"{pr_data['body']}\n\n")
+            
+            instructions.append("**Files Changed**:\n")
+            for file in pr_data.get('files', []):
+                instructions.append(f"- {file.get('path')}\n")
+            
+            instructions.append("\n## Your Task\n")
+            instructions.append("1. Review the PR described above\n")
+            instructions.append("2. Examine the code changes\n")
+            instructions.append("3. Provide feedback on code quality, potential issues, and suggestions for improvement\n")
+            instructions.append("4. Post your review as a comment on the PR\n")
+            
+        except Exception as e:
+            logger.error(f"Failed to get PR details: {str(e)}")
+            instructions.append(f"## Review Pull Request #{issue_or_pr_number}\n")
+            instructions.append("Could not fetch PR details. Please use GitHub CLI to get the PR information.\n")
+    
+    else:
+        # Custom command fallback
+        instructions.append(f"## Custom Command\n")
+        instructions.append(f"Command: {prompt}\n\n")
+        instructions.append("Please execute this command and take appropriate actions.\n")
+    
+    # Write instructions to file
+    with open(file_path, 'w') as f:
+        f.write('\n'.join(instructions))
+    
+    return file_path
+
 def run_claude_code_headless(prompt, allowed_tools=None):
     """Run Claude Code in headless mode with the given prompt"""
     claude_path = os.environ.get('CLAUDE_CODE_PATH', 'claude')
-    command = [claude_path, '-p', prompt]
     
-    if allowed_tools:
-        command.extend(['--allowedTools', allowed_tools])
+    # Create logs directory if it doesn't exist
+    log_dir = os.path.join(os.getcwd(), '.autonomous-claude', 'logs')
+    os.makedirs(log_dir, exist_ok=True)
     
-    logger.info(f"Running Claude Code with command: {' '.join(command)}")
-    
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        logger.info(f"Claude Code execution successful")
-        return {
-            'success': True,
-            'stdout': result.stdout,
-            'stderr': result.stderr
-        }
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Claude Code execution failed: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e),
-            'stdout': e.stdout,
-            'stderr': e.stderr
-        }
+    # Check if the prompt starts with a slash command (custom command)
+    # For custom commands like /project:analyze-github-issue, convert to file-based instructions
+    if prompt.startswith('/'):
+        # Extract command type and parameters
+        if prompt.startswith('/project:analyze-github-issue'):
+            command_type = 'analyze-github-issue'
+            issue_number = prompt.split()[-1]
+            instruction_file = create_instruction_file(command_type, issue_number)
+        elif prompt.startswith('/project:implement-github-issue'):
+            command_type = 'implement-github-issue'
+            issue_number = prompt.split()[-1]
+            instruction_file = create_instruction_file(command_type, issue_number)
+        elif prompt.startswith('/project:document-project'):
+            command_type = 'document-project'
+            instruction_file = create_instruction_file(command_type)
+        elif prompt.startswith('/project:review-pull-request'):
+            command_type = 'review-pull-request'
+            pr_number = prompt.split()[-1]
+            instruction_file = create_instruction_file(command_type, pr_number)
+        else:
+            # Fallback for unknown custom commands
+            command_type = 'custom-command'
+            instruction_file = create_instruction_file(command_type, prompt=prompt)
+        
+        logger.info(f"Running Claude Code with file-based instructions for: {command_type}")
+        logger.info(f"Instruction file: {instruction_file}")
+        
+        # Run Claude in print mode with the instruction file
+        file_prompt = f"Read and execute the instructions in this file: {instruction_file}"
+        command = [claude_path, '-p', file_prompt, '--dangerously-skip-permissions']
+        
+        if allowed_tools:
+            command.extend(['--allowedTools', allowed_tools])
+        
+        try:
+            logger.info(f"Running Claude Code with command: {' '.join(command)}")
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Claude Code execution successful")
+            return {
+                'success': True,
+                'stdout': result.stdout,
+                'stderr': result.stderr
+            }
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Claude Code execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'stdout': e.stdout,
+                'stderr': e.stderr
+            }
+        except Exception as e:
+            logger.error(f"Claude Code execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'stdout': "",
+                'stderr': str(e)
+            }
+    else:
+        # For regular prompts, use print mode (-p) with the requested tools
+        command = [claude_path, '-p', prompt, '--dangerously-skip-permissions']
+        
+        if allowed_tools:
+            command.extend(['--allowedTools', allowed_tools])
+        
+        logger.info(f"Running Claude Code with command: {' '.join(command)}")
+        
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Claude Code execution successful")
+            return {
+                'success': True,
+                'stdout': result.stdout,
+                'stderr': result.stderr
+            }
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Claude Code execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'stdout': e.stdout,
+                'stderr': e.stderr
+            }
 
 def process_github_issue(issue_number):
     """Process a GitHub issue through the autonomous workflow"""
     logger.info(f"Processing GitHub issue #{issue_number}")
     
-    # Step 1: Analyze the issue and create a plan
+    # Create/update lock file
     project_path = os.environ.get('PROJECT_PATH', os.getcwd())
-    analyze_prompt = f"/project:analyze-github-issue {issue_number}"
+    tasks_dir = os.path.join(project_path, '.autonomous-claude', 'tasks')
+    os.makedirs(tasks_dir, exist_ok=True)
     
-    result = run_claude_code_headless(
-        analyze_prompt,
-        "Bash(gh:*) Edit Run"
-    )
+    # Get unique project ID to ensure lock files don't conflict between projects
+    project_id_file = os.path.join(project_path, '.autonomous-claude', 'project_id')
+    project_id = ''
+    if os.path.exists(project_id_file):
+        with open(project_id_file, 'r') as f:
+            project_id = f.read().strip()
     
-    if not result['success']:
-        logger.error(f"Failed to analyze issue #{issue_number}")
+    # Use project ID in lock file name to ensure isolation between projects
+    lock_file = os.path.join(tasks_dir, f"{project_id}-issue-{issue_number}.lock")
+    
+    # Update lock file with current timestamp
+    with open(lock_file, 'w') as f:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"Processing started: {timestamp}\n")
+    
+    logger.info(f"Created/updated lock file for issue #{issue_number}")
+    
+    try:
+        # Step 1: Analyze the issue and create a plan
+        analyze_prompt = f"/project:analyze-github-issue {issue_number}"
+        
+        result = run_claude_code_headless(
+            analyze_prompt,
+            "Bash(gh:*) Edit Run"
+        )
+        
+        if not result['success']:
+            logger.error(f"Failed to analyze issue #{issue_number}")
+            # Don't remove lock file here - keep it as a record of failure
+            return {
+                'success': False,
+                'stage': 'analyze',
+                'error': result['stderr']
+            }
+        
+        logger.info(f"Successfully analyzed issue #{issue_number}")
+        
+        # Update lock file to indicate progress
+        with open(lock_file, 'a') as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"Analysis completed: {timestamp}\n")
+        
+        # Check if plan file exists
+        plan_file = os.path.join(tasks_dir, f"{issue_number}-plan.md")
+        if not os.path.exists(plan_file):
+            logger.warning(f"Plan file not found after analysis for issue #{issue_number}")
+            # Still continue to implementation even if plan file not found
+        
+        # Step 2: Implement the solution
+        implement_prompt = f"/project:implement-github-issue {issue_number}"
+        
+        result = run_claude_code_headless(
+            implement_prompt,
+            "Bash(gh:*,git:*) Edit Run Test"
+        )
+        
+        if not result['success']:
+            logger.error(f"Failed to implement solution for issue #{issue_number}")
+            # Update lock file with failure information
+            with open(lock_file, 'a') as f:
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"Implementation failed: {timestamp}\n")
+            
+            return {
+                'success': False,
+                'stage': 'implement',
+                'error': result['stderr']
+            }
+        
+        logger.info(f"Successfully implemented solution for issue #{issue_number}")
+        
+        # Update lock file to indicate progress
+        with open(lock_file, 'a') as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"Implementation completed: {timestamp}\n")
+        
+        # Step 3: Extract PR number and track relationship
+        # This attempts to find the PR number from the implementation output
+        pr_number = None
+        try:
+            # Look for a PR link in the output
+            import re
+            pr_url_pattern = r'https://github\.com/[^/]+/[^/]+/pull/(\d+)'
+            pr_number_pattern = r'Created PR #(\d+)'
+            
+            pr_url_match = re.search(pr_url_pattern, result['stdout'])
+            pr_number_match = re.search(pr_number_pattern, result['stdout'])
+            
+            if pr_url_match:
+                pr_number = pr_url_match.group(1)
+                logger.info(f"Found PR number from URL: {pr_number}")
+            elif pr_number_match:
+                pr_number = pr_number_match.group(1)
+                logger.info(f"Found PR number from text: {pr_number}")
+            
+            if pr_number:
+                # Try to import PR relationship module if available
+                try:
+                    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+                    from pr_issue_relationship import get_instance
+                    
+                    # Associate PR with issue
+                    relationship_manager = get_instance()
+                    relationship_manager.associate_pr_with_issue(issue_number, pr_number)
+                    
+                    logger.info(f"Associated PR #{pr_number} with issue #{issue_number}")
+                    
+                    # Update lock file with PR information
+                    with open(lock_file, 'a') as f:
+                        f.write(f"PR created: #{pr_number}\n")
+                    
+                    # Step 4: Trigger PR review if auto-review is enabled
+                    auto_review = os.environ.get('PR_AUTO_REVIEW', 'true').lower() == 'true'
+                    if auto_review:
+                        logger.info(f"Triggering auto-review for PR #{pr_number}")
+                        
+                        # Add a delay to allow GitHub to process the PR
+                        auto_review_delay = int(os.environ.get('PR_AUTO_REVIEW_DELAY', '30'))
+                        time.sleep(auto_review_delay)
+                        
+                        # Try to import tasks module
+                        try:
+                            from tasks import enqueue_review_pull_request
+                            
+                            # Enqueue PR review
+                            job_id = enqueue_review_pull_request(pr_number)
+                            logger.info(f"Enqueued PR review job with ID: {job_id}")
+                            
+                            # Update lock file with review information
+                            with open(lock_file, 'a') as f:
+                                f.write(f"Auto-review triggered: job ID {job_id}\n")
+                        except Exception as e:
+                            logger.error(f"Failed to enqueue PR review: {str(e)}")
+                except ImportError as e:
+                    logger.warning(f"PR relationship module not available: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to associate PR with issue: {str(e)}")
+            else:
+                logger.warning(f"No PR number found in implementation output for issue #{issue_number}")
+        except Exception as e:
+            logger.error(f"Error extracting PR number from output: {str(e)}")
+        
+        # Create a note to indicate successful completion
+        completion_file = os.path.join(tasks_dir, f"{issue_number}-completed.txt")
+        with open(completion_file, 'w') as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"Issue #{issue_number} fully processed at {timestamp}\n")
+            if pr_number:
+                f.write(f"PR created: #{pr_number}\n")
+        
+        return {
+            'success': True,
+            'issue_number': issue_number,
+            'pr_number': pr_number,
+            'completed_at': time.time()
+        }
+    except Exception as e:
+        # Log any unexpected errors
+        logger.error(f"Unexpected error processing issue #{issue_number}: {str(e)}")
+        
+        # Update lock file with error information
+        with open(lock_file, 'a') as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"Error occurred: {timestamp} - {str(e)}\n")
+        
         return {
             'success': False,
-            'stage': 'analyze',
-            'error': result['stderr']
+            'stage': 'unknown',
+            'error': str(e)
         }
-    
-    logger.info(f"Successfully analyzed issue #{issue_number}")
-    
-    # Step 2: Implement the solution
-    implement_prompt = f"/project:implement-github-issue {issue_number}"
-    
-    result = run_claude_code_headless(
-        implement_prompt,
-        "Bash(gh:*,git:*) Edit Run Test"
-    )
-    
-    if not result['success']:
-        logger.error(f"Failed to implement solution for issue #{issue_number}")
-        return {
-            'success': False,
-            'stage': 'implement',
-            'error': result['stderr']
-        }
-    
-    logger.info(f"Successfully implemented solution for issue #{issue_number}")
-    
-    return {
-        'success': True,
-        'issue_number': issue_number,
-        'completed_at': time.time()
-    }
 
 def update_project_documentation():
     """Update project documentation using Claude Code"""
@@ -472,24 +869,72 @@ def review_pull_request(pr_number):
     reviews_dir = os.path.join(project_path, '.autonomous-claude', 'reviews')
     os.makedirs(reviews_dir, exist_ok=True)
     
+    # Get unique project ID to ensure lock files don't conflict between projects
+    project_id_file = os.path.join(project_path, '.autonomous-claude', 'project_id')
+    project_id = ''
+    if os.path.exists(project_id_file):
+        with open(project_id_file, 'r') as f:
+            project_id = f.read().strip()
+    
     # Create a lock file to indicate the PR is being processed
-    lock_file = os.path.join(reviews_dir, f"pr-{pr_number}.lock")
+    # Include project ID to ensure isolation between projects
+    lock_file = os.path.join(reviews_dir, f"{project_id}-pr-{pr_number}.lock")
     if not os.path.exists(lock_file):
         with open(lock_file, 'w') as f:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.now().isoformat()
             f.write(f"Review started: {timestamp}\n")
     
-    # Check if a review already exists
+    # Import PR relationship module if available
+    try:
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from pr_issue_relationship import get_instance
+        relationship_manager = get_instance()
+        
+        # Update review status to in_progress
+        relationship_manager.update_pr_review_status(pr_number, 'in_progress')
+        logger.info(f"Updated PR review status to in_progress for PR #{pr_number}")
+    except ImportError as e:
+        logger.warning(f"Failed to import PR relationship module: {str(e)}")
+        relationship_manager = None
+    except Exception as e:
+        logger.warning(f"Failed to update PR review status: {str(e)}")
+        relationship_manager = None
+    
+    # Check if a review already exists and if we should re-review
     review_file = os.path.join(reviews_dir, f"pr-{pr_number}-review.md")
-    if os.path.exists(review_file):
-        logger.info(f"Review already exists for PR #{pr_number}, skipping")
+    should_review = True
+    
+    # Check with relationship manager if PR should be reviewed
+    if relationship_manager:
+        try:
+            should_review = relationship_manager.should_review_pr(pr_number)
+            logger.info(f"Relationship manager: should review PR #{pr_number}? {should_review}")
+        except Exception as e:
+            logger.warning(f"Failed to check should_review_pr: {str(e)}")
+            # Default to reviewing if we can't determine
+            should_review = True
+    elif os.path.exists(review_file):
+        # Fall back to simple file check if relationship manager isn't available
+        logger.info(f"Review already exists for PR #{pr_number}, using simple file check")
+        should_review = False
+    
+    # Skip if we shouldn't review
+    if not should_review:
+        logger.info(f"Skipping review for PR #{pr_number} based on status check")
+        # Remove lock file
+        try:
+            os.remove(lock_file)
+        except:
+            logger.warning(f"Failed to remove lock file for PR #{pr_number}")
+        
         return {
             'success': True,
             'pr_number': pr_number,
             'completed_at': time.time(),
             'status': 'skipped'
         }
-        
+    
+    # Proceed with review
     review_prompt = f"/project:review-pull-request {pr_number}"
     
     result = run_claude_code_headless(
@@ -497,14 +942,24 @@ def review_pull_request(pr_number):
         "Bash(gh:*,git:*) Edit Run"
     )
     
-    # Remove lock file after processing
-    try:
-        os.remove(lock_file)
-    except:
-        logger.warning(f"Failed to remove lock file for PR #{pr_number}")
-    
+    # Process result
     if not result['success']:
         logger.error(f"Failed to review PR #{pr_number}")
+        
+        # Update review status to failed if relationship manager is available
+        if relationship_manager:
+            try:
+                relationship_manager.update_pr_review_status(pr_number, 'failed')
+                logger.info(f"Updated PR review status to failed for PR #{pr_number}")
+            except Exception as e:
+                logger.warning(f"Failed to update PR review status to failed: {str(e)}")
+        
+        # Remove lock file
+        try:
+            os.remove(lock_file)
+        except:
+            logger.warning(f"Failed to remove lock file for PR #{pr_number}")
+        
         return {
             'success': False,
             'stage': 'review',
@@ -514,14 +969,50 @@ def review_pull_request(pr_number):
     logger.info(f"Successfully reviewed PR #{pr_number}")
     
     # Check if review file was created
+    review_id = None
     if os.path.exists(review_file):
         logger.info(f"Review file created for PR #{pr_number}")
+        
+        # Add review record in relationship manager
+        if relationship_manager:
+            try:
+                # Read review file content
+                with open(review_file, 'r') as f:
+                    review_content = f.read()
+                
+                # Save review to history
+                review_data = {
+                    'content': review_content,
+                    'timestamp': datetime.now().isoformat(),
+                    'file_path': review_file
+                }
+                
+                # Add review record and get review ID
+                review_id = relationship_manager.add_review_record(pr_number, review_data)
+                logger.info(f"Added review record for PR #{pr_number} with ID {review_id}")
+            except Exception as e:
+                logger.warning(f"Failed to add review record: {str(e)}")
     else:
         logger.warning(f"Review file not created for PR #{pr_number}")
+    
+    # Update PR review status to completed if relationship manager is available
+    if relationship_manager:
+        try:
+            relationship_manager.update_pr_review_status(pr_number, 'completed', review_id)
+            logger.info(f"Updated PR review status to completed for PR #{pr_number}")
+        except Exception as e:
+            logger.warning(f"Failed to update PR review status to completed: {str(e)}")
+    
+    # Remove lock file
+    try:
+        os.remove(lock_file)
+    except:
+        logger.warning(f"Failed to remove lock file for PR #{pr_number}")
     
     return {
         'success': True,
         'pr_number': pr_number,
+        'review_id': review_id,
         'completed_at': time.time()
     }
 
@@ -529,9 +1020,9 @@ def review_pull_request(pr_number):
 if __name__ == '__main__':
     logger.info(f"Starting worker for queue: {queue_name}")
     
-    with Connection(redis_conn):
-        worker = Worker([queue])
-        worker.work()
+    # Initialize worker with explicit connection parameter for RQ v2.3.3 compatibility
+    worker = Worker([queue], connection=redis_conn)
+    worker.work()
 EOF
 
     log "INFO" "Created worker script at $PROJECT_PATH/.autonomous-claude/worker.py"
@@ -546,8 +1037,8 @@ import time
 from redis import Redis
 from rq import Queue
 
-# Add parent directory to path so we can import worker
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add current directory to path so we can import worker
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from worker import process_github_issue, update_project_documentation, review_pull_request
 
 # Redis connection
@@ -804,6 +1295,18 @@ check_github_issues() {
   tasks_dir="$PROJECT_PATH/.autonomous-claude/tasks"
   mkdir -p "$tasks_dir"
   
+  # Get or create project ID for isolation
+  project_id_file="$PROJECT_PATH/.autonomous-claude/project_id"
+  if [ -f "$project_id_file" ]; then
+    project_id=$(cat "$project_id_file")
+    log "INFO" "Using existing project ID: $project_id"
+  else
+    # Create a unique project ID based on the absolute path hash
+    project_id=$(echo "$PROJECT_PATH" | shasum -a 256 | cut -c1-16)
+    echo "$project_id" > "$project_id_file"
+    log "INFO" "Created new project ID: $project_id"
+  fi
+  
   # Verify write access to the tasks directory
   test_file="$tasks_dir/test-access.txt"
   echo "Testing write access at $(date)" > "$test_file"
@@ -837,38 +1340,60 @@ check_github_issues() {
     log "INFO" "Extracted issue #$issue_number: $issue_title"
     
     # Check if this issue already has a plan or lock file
-    plan_file="$tasks_dir/${issue_number}-plan.md"
-    lock_file="$tasks_dir/${issue_number}.lock"
+    project_plan_file="$tasks_dir/${project_id}-issue-${issue_number}-plan.md"
+    old_plan_file="$tasks_dir/${issue_number}-plan.md"
+    project_lock_file="$tasks_dir/${project_id}-issue-${issue_number}.lock"
+    old_lock_file="$tasks_dir/${issue_number}.lock"
     
-    log "INFO" "Checking plan file: $plan_file"
-    if [ -f "$plan_file" ]; then
-      log "INFO" "Issue #$issue_number already has a plan, skipping"
+    log "INFO" "Checking plan files for project: $project_id, issue: $issue_number"
+    # Check both new and old format plan files
+    if [ -f "$project_plan_file" ]; then
+      log "INFO" "Issue #$issue_number already has a plan in project $project_id, skipping"
+      continue
+    elif [ -f "$old_plan_file" ]; then
+      log "INFO" "Issue #$issue_number has an old-format plan file, skipping"
       continue
     fi
     
-    log "INFO" "Checking lock file: $lock_file"
-    if [ -f "$lock_file" ]; then
+    log "INFO" "Checking lock files for project: $project_id, issue: $issue_number"
+    # Check both new and old format lock files
+    if [ -f "$project_lock_file" ]; then
       # Check if lock file is more than 1 hour old
-      lock_time=$(stat -f "%m" "$lock_file")
+      lock_time=$(stat -f "%m" "$project_lock_file")
       current_time=$(date +%s)
       age_seconds=$((current_time - lock_time))
       
       if [ $age_seconds -lt 3600 ]; then  # Less than 1 hour old
-        log "INFO" "Issue #$issue_number is already being processed (lock created $(($age_seconds / 60)) minutes ago)"
+        log "INFO" "Issue #$issue_number is already being processed in project $project_id (lock created $(($age_seconds / 60)) minutes ago)"
         continue
       else
-        log "INFO" "Found stale lock for issue #$issue_number, re-enqueueing"
-        rm "$lock_file"
+        log "INFO" "Found stale lock for issue #$issue_number in project $project_id, re-enqueueing"
+        rm "$project_lock_file"
+      fi
+    elif [ -f "$old_lock_file" ]; then
+      # Check old format lock file too
+      lock_time=$(stat -f "%m" "$old_lock_file")
+      current_time=$(date +%s)
+      age_seconds=$((current_time - lock_time))
+      
+      if [ $age_seconds -lt 3600 ]; then
+        log "INFO" "Issue #$issue_number is already being processed with old-format lock (created $(($age_seconds / 60)) minutes ago)"
+        continue
+      else
+        log "INFO" "Found stale old-format lock for issue #$issue_number, re-enqueueing"
+        rm "$old_lock_file"
       fi
     fi
     
-    # Create a lock file
+    # Create a project-specific lock file
     timestamp=$(date)
-    log "INFO" "Creating lock file for issue #$issue_number at $timestamp"
-    echo "Enqueued at $timestamp" > "$lock_file"
+    log "INFO" "Creating lock file for issue #$issue_number in project $project_id at $timestamp"
+    echo "Enqueued at $timestamp" > "$project_lock_file"
+    echo "Project ID: $project_id" >> "$project_lock_file"
+    echo "Project Path: $PROJECT_PATH" >> "$project_lock_file"
     
-    if [ ! -f "$lock_file" ]; then
-      log "ERROR" "Failed to create lock file for issue #$issue_number"
+    if [ ! -f "$project_lock_file" ]; then
+      log "ERROR" "Failed to create lock file for issue #$issue_number in project $project_id"
       continue
     fi
     
@@ -884,12 +1409,12 @@ check_github_issues() {
     job_id=$(cat "$PROJECT_PATH/.autonomous-claude/logs/enqueue_output.txt" | grep -o "Enqueued job with ID: .*" | sed 's/Enqueued job with ID: //')
     
     # Add job ID to lock file
-    echo "Job ID: $job_id" >> "$lock_file"
-    log "INFO" "Enqueued issue #$issue_number with job ID: $job_id"
+    echo "Job ID: $job_id" >> "$project_lock_file"
+    log "INFO" "Enqueued issue #$issue_number with job ID: $job_id in project $project_id"
     
     # Verify lock file contents
-    log "INFO" "Lock file contents for issue #$issue_number:"
-    cat "$lock_file" | while read line; do
+    log "INFO" "Lock file contents for issue #$issue_number in project $project_id:"
+    cat "$project_lock_file" | while read line; do
       log "INFO" "  $line"
     done
   done
@@ -902,6 +1427,19 @@ check_github_prs() {
   mkdir -p "$PROJECT_PATH/.autonomous-claude/tasks"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/reviews"
   mkdir -p "$PROJECT_PATH/.autonomous-claude/data"
+  mkdir -p "$PROJECT_PATH/.autonomous-claude/task_analysis"
+  
+  # Get or create project ID for isolation
+  project_id_file="$PROJECT_PATH/.autonomous-claude/project_id"
+  if [ -f "$project_id_file" ]; then
+    project_id=$(cat "$project_id_file")
+    log "INFO" "Using existing project ID for PR checks: $project_id"
+  else
+    # Create a unique project ID based on the absolute path hash
+    project_id=$(echo "$PROJECT_PATH" | shasum -a 256 | cut -c1-16)
+    echo "$project_id" > "$project_id_file"
+    log "INFO" "Created new project ID for PR checks: $project_id"
+  fi
   
   # Get the list of open PRs with detailed information
   prs=$(gh pr list --repo "$GITHUB_REPO" --state open --json number,title,url,author,updatedAt,commits,additions,deletions,changedFiles)

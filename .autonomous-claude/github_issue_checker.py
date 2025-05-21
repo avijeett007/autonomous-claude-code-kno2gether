@@ -46,23 +46,55 @@ def is_already_processed(issue_number):
     project_path = os.environ.get('PROJECT_PATH', os.getcwd())
     tasks_dir = os.path.join(project_path, '.autonomous-claude', 'tasks')
     
+    # Get project ID for isolation
+    project_id_file = os.path.join(project_path, '.autonomous-claude', 'project_id')
+    project_id = ''
+    if os.path.exists(project_id_file):
+        with open(project_id_file, 'r') as f:
+            project_id = f.read().strip()
+    else:
+        # Create project ID if it doesn't exist
+        import hashlib
+        project_id = hashlib.sha256(project_path.encode()).hexdigest()[:16]
+        os.makedirs(os.path.dirname(project_id_file), exist_ok=True)
+        with open(project_id_file, 'w') as f:
+            f.write(project_id)
+        logger.info(f"Created new project ID: {project_id}")
+    
     # Plan file would indicate issue has been analyzed
-    plan_file = os.path.join(tasks_dir, f"{issue_number}-plan.md")
+    plan_file = os.path.join(tasks_dir, f"{project_id}-issue-{issue_number}-plan.md")
     if os.path.exists(plan_file):
-        logger.info(f"Issue #{issue_number} already has a plan file")
+        logger.info(f"Issue #{issue_number} already has a plan file in project {project_id}")
+        return True
+    
+    # Also check the old format for backward compatibility
+    old_plan_file = os.path.join(tasks_dir, f"{issue_number}-plan.md")
+    if os.path.exists(old_plan_file):
+        logger.info(f"Issue #{issue_number} has an old-format plan file")
         return True
     
     # Lock file indicates issue is being processed
-    lock_file = os.path.join(tasks_dir, f"{issue_number}.lock")
+    lock_file = os.path.join(tasks_dir, f"{project_id}-issue-{issue_number}.lock")
     if os.path.exists(lock_file):
         # Check if lock is stale (older than 1 hour)
         lock_time = os.path.getmtime(lock_file)
         if time.time() - lock_time < 3600:  # 1 hour in seconds
-            logger.info(f"Issue #{issue_number} is currently being processed")
+            logger.info(f"Issue #{issue_number} is currently being processed in project {project_id}")
             return True
         else:
-            logger.warning(f"Found stale lock for issue #{issue_number}, removing")
+            logger.warning(f"Found stale lock for issue #{issue_number} in project {project_id}, removing")
             os.remove(lock_file)
+    
+    # Also check the old lock file format for backward compatibility
+    old_lock_file = os.path.join(tasks_dir, f"{issue_number}.lock")
+    if os.path.exists(old_lock_file):
+        lock_time = os.path.getmtime(old_lock_file)
+        if time.time() - lock_time < 3600:
+            logger.info(f"Issue #{issue_number} is currently being processed (old format lock)")
+            return True
+        else:
+            logger.warning(f"Found stale old-format lock for issue #{issue_number}, removing")
+            os.remove(old_lock_file)
     
     return False
 
@@ -72,12 +104,30 @@ def create_lock_file(issue_number):
     tasks_dir = os.path.join(project_path, '.autonomous-claude', 'tasks')
     os.makedirs(tasks_dir, exist_ok=True)
     
-    lock_file = os.path.join(tasks_dir, f"{issue_number}.lock")
+    # Get project ID for isolation
+    project_id_file = os.path.join(project_path, '.autonomous-claude', 'project_id')
+    project_id = ''
+    if os.path.exists(project_id_file):
+        with open(project_id_file, 'r') as f:
+            project_id = f.read().strip()
+    else:
+        # Create project ID if it doesn't exist
+        import hashlib
+        project_id = hashlib.sha256(project_path.encode()).hexdigest()[:16]
+        os.makedirs(os.path.dirname(project_id_file), exist_ok=True)
+        with open(project_id_file, 'w') as f:
+            f.write(project_id)
+        logger.info(f"Created new project ID: {project_id}")
+    
+    # Use project ID in lock file name to ensure isolation between projects
+    lock_file = os.path.join(tasks_dir, f"{project_id}-issue-{issue_number}.lock")
     with open(lock_file, 'w') as f:
         timestamp = datetime.now().isoformat()
         f.write(f"Processing started: {timestamp}\n")
+        f.write(f"Project ID: {project_id}\n")
+        f.write(f"Project Path: {project_path}\n")
     
-    logger.info(f"Created lock file for issue #{issue_number}")
+    logger.info(f"Created lock file for issue #{issue_number} in project {project_id}")
     return True
 
 def process_issues(issues_json):
@@ -112,9 +162,29 @@ def process_issues(issues_json):
                 
                 # Remove lock file on failure
                 project_path = os.environ.get('PROJECT_PATH', os.getcwd())
-                lock_file = os.path.join(project_path, '.autonomous-claude', 'tasks', f"{issue_number}.lock")
+                
+                # Get project ID for isolation
+                project_id_file = os.path.join(project_path, '.autonomous-claude', 'project_id')
+                project_id = ''
+                if os.path.exists(project_id_file):
+                    with open(project_id_file, 'r') as f:
+                        project_id = f.read().strip()
+                else:
+                    # Fallback if no project ID exists
+                    import hashlib
+                    project_id = hashlib.sha256(project_path.encode()).hexdigest()[:16]
+                
+                # Look for both new and old format lock files
+                lock_file = os.path.join(project_path, '.autonomous-claude', 'tasks', f"{project_id}-issue-{issue_number}.lock")
+                old_lock_file = os.path.join(project_path, '.autonomous-claude', 'tasks', f"{issue_number}.lock")
+                
                 if os.path.exists(lock_file):
+                    logger.info(f"Removing lock file for failed issue #{issue_number} in project {project_id}")
                     os.remove(lock_file)
+                
+                if os.path.exists(old_lock_file):
+                    logger.info(f"Removing old-format lock file for failed issue #{issue_number}")
+                    os.remove(old_lock_file)
         
         return True
     except json.JSONDecodeError:

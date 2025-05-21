@@ -1,0 +1,4 @@
+2025-05-20 00:53:34,392 - github-issue-checker - INFO - Processing 1 issues
+2025-05-20 00:53:34,612 - github-issue-checker - INFO - Found issue #999: Test Issue for GitHub Issue Checker
+2025-05-20 00:53:34,613 - github-issue-checker - INFO - Created lock file for issue #999
+2025-05-20 00:53:34,623 - github-issue-checker - INFO - Enqueued issue #999 with job ID: 6408b623-1b56-430e-966a-2a31f314a8bd

@@ -138,7 +138,7 @@ class PRIssueRelationship:
         if pr_url is None or pr_title is None:
             try:
                 pr_json = subprocess.check_output(
-                    ['gh', 'pr', 'view', pr_number, '--json', 'title,url,author'],
+                    ['gh', 'pr', 'view', str(pr_number), '--json', 'title,url,author'],
                     text=True
                 )
                 pr_data = json.loads(pr_json)
@@ -155,7 +155,7 @@ class PRIssueRelationship:
             # If we don't have author, try to get it
             try:
                 pr_json = subprocess.check_output(
-                    ['gh', 'pr', 'view', pr_number, '--json', 'author'],
+                    ['gh', 'pr', 'view', str(pr_number), '--json', 'author'],
                     text=True
                 )
                 pr_data = json.loads(pr_json)

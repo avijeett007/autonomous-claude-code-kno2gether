@@ -8,7 +8,8 @@ Follow these steps:
 3. Check if the PR is related to a specific issue:
    - Look in the PR description for "Fixes #X" or "Closes #X" references
    - If found, note the issue number for relationship tracking
-4. Analyze the code changes for:
+4. Check if this is an initial review or a re-review of an updated PR
+5. Analyze the code changes for:
    - Code quality issues (style, conventions, readability)
    - Potential bugs or logical errors
    - Security concerns (input validation, auth issues, etc.)
@@ -17,12 +18,12 @@ Follow these steps:
    - Completeness of implementation
    - Test coverage and quality
    - Documentation completeness
-5. Check for any related PRs or previous reviews
-6. Generate a comprehensive review using the template at `.autonomous-claude/templates/pr_review_template.md`
-7. Fill in all sections of the template with detailed analysis
-8. Save the review to `.autonomous-claude/reviews/pr-{pr_number}-review.md`
-9. Record the review in the PR-Issue relationship tracking system
-10. Post the review as a comment on the PR using the GitHub CLI
+6. Check for any related PRs or previous reviews
+7. Generate a comprehensive review using the template at `.autonomous-claude/templates/pr_review_template.md`
+8. Fill in all sections of the template with detailed analysis
+9. Save the review to `.autonomous-claude/reviews/pr-{pr_number}-review.md`
+10. Record the review in the PR-Issue relationship tracking system
+11. Post the review as a comment on the PR using the GitHub CLI
 
 Your review must include:
 - Severity levels for each issue (Critical, High, Medium, Low)
@@ -34,9 +35,16 @@ Your review must include:
 
 The review should use a consistent, structured format that helps track issues across PR updates. Use markdown formatting to make the review easy to read.
 
+For re-reviews of updated PRs:
+- Focus primarily on changes made since the last review
+- Check if previous issues have been addressed
+- Note any new issues introduced by the changes
+- Be more lenient on minor issues if the PR author has made significant progress
+
 Update the PR-Issue relationship tracking with:
 - The PR's relationship to any referenced issues
 - The review ID and timestamp
 - Review status (completed)
+- Review type (initial or re-review)
 
 ARGUMENTS: {pr_number}
